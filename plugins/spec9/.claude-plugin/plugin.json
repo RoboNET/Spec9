@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "spec9",
+  "displayName": "Spec9",
+  "version": "0.1.0",
+  "description": "Domain-addressable specification workflows and semantic review tooling.",
+  "author": {
+    "name": "RoboNET",
+    "url": "https://github.com/RoboNET"
+  },
+  "homepage": "https://github.com/RoboNET/Spec9",
+  "repository": "https://github.com/RoboNET/Spec9",
+  "license": "MIT",
+  "keywords": ["specification", "domain-modeling", "sdd", "ddd", "review"],
+  "skills": "./skills/"
+}

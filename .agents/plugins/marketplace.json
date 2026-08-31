@@ -1,0 +1,20 @@
+{
+  "name": "spec9",
+  "interface": {
+    "displayName": "Spec9"
+  },
+  "plugins": [
+    {
+      "name": "spec9",
+      "source": {
+        "source": "local",
+        "path": "./plugins/spec9"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Adopt Spec9"
-  short_description: "Set up a product profile and first semantic slice"
-  default_prompt: "Use $spec9-adopt to add Spec9 to this product and validate a first vertical slice."

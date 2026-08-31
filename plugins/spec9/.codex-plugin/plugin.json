@@ -1,0 +1,30 @@
+{
+  "name": "spec9",
+  "version": "0.1.0",
+  "description": "Domain-addressable specification workflows and semantic review tooling.",
+  "author": {
+    "name": "RoboNET",
+    "url": "https://github.com/RoboNET"
+  },
+  "homepage": "https://github.com/RoboNET/Spec9",
+  "repository": "https://github.com/RoboNET/Spec9",
+  "license": "MIT",
+  "keywords": ["specification", "domain-modeling", "sdd", "ddd", "review"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Spec9",
+    "shortDescription": "Domain-addressable specification workflows",
+    "longDescription": "Adopt, author, implement, and review product specifications as a graph of domain terms, requirements, processes, boundaries, decisions, and evidence.",
+    "developerName": "RoboNET",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "websiteURL": "https://github.com/RoboNET/Spec9",
+    "defaultPrompt": [
+      "Describe this product with Spec9.",
+      "Implement this Spec9 requirement.",
+      "Review Spec9 changes from the Git base."
+    ],
+    "brandColor": "#6D5EF7",
+    "screenshots": []
+  }
+}

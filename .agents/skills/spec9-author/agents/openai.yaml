@@ -1,4 +1,0 @@
-interface:
-  display_name: "Author Spec9"
-  short_description: "Write domain pages, norms, flows, boundaries, and ADRs"
-  default_prompt: "Use $spec9-author to describe this domain concept or process as a validated Spec9 page."

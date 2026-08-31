@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "spec9",
+  "owner": {
+    "name": "RoboNET"
+  },
+  "description": "Spec9 domain-addressable specification tools and agent workflows.",
+  "plugins": [
+    {
+      "name": "spec9",
+      "source": "./plugins/spec9",
+      "description": "Adopt, author, implement, and review Spec9 product specifications.",
+      "category": "development"
+    }
+  ]
+}

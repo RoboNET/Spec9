@@ -1,75 +1,86 @@
 # Spec9
 
-Spec9 — движок доменно-адресуемых спецификаций. Он хранит смысл в Markdown с
-YAML-frontmatter, строит граф терминов, норм, процессов, границ и решений и
-связывает их с кодом, тестами, схемами и макетами через типизированные якоря.
+Spec9 is a domain-addressable specification engine. It stores meaning in
+Markdown with YAML frontmatter, builds a graph of terms, requirements,
+processes, boundaries, and decisions, and connects them to code, tests,
+schemas, and designs through typed anchors.
 
-Этот репозиторий содержит переиспользуемый движок, грамматику, конституцию и
-набор агентских навыков. Конкретный продукт хранит рядом только свой экземпляр
-спецификации: `profile.yaml`, страницы домена и необязательный
-`candidates.yaml`.
+This repository is three distributions backed by one source tree:
 
-## Использование
+- the `spec9` npm CLI, intended to run with `npx`;
+- a Codex plugin and marketplace;
+- a Claude Code plugin and marketplace.
+
+The shared plugin lives in `plugins/spec9/`. Skills, format documentation, tools, and
+documentation are never copied into vendor-specific variants.
+
+## CLI
+
+After the package is published, run Spec9 without a global installation:
+
+```bash
+npx --yes spec9@0.1.0 --spec-root /path/to/product/spec9 \
+  --product-root /path/to/product lint
+npx --yes spec9@0.1.0 --spec-root /path/to/product/spec9 \
+  --product-root /path/to/product review --base HEAD
+```
+
+When run from a product root containing `spec9/profile.yaml`, both roots are
+discovered automatically. When run from the specification directory containing
+`profile.yaml`, the parent directory is used as the product root.
+
+The primary commands are `lint`, `graph`, `flow`, `context`, `trace`,
+`decision`, `doctor`, `quality`, `next`, `review`, `change`, `coverage`, `e2e`,
+`outcomes`, and `candidates`. Run `npx --yes spec9@0.1.0 --help` for the full
+command list.
+
+During development of this repository, `npm exec -- spec9 ...` uses the local
+worktree instead of downloading the published package.
+
+## Agent plugins
+
+Both agents consume the same skills:
+
+- `adopt` sets up a product profile and validates its first vertical slice;
+- `author` creates and evolves domain pages, requirements, processes,
+  boundaries, patterns, and ADRs;
+- `implement` drives a product change from semantic context to code, evidence,
+  and a `Domain impact` section;
+- `review` prepares a top-down semantic review for an existing annotation UI.
+
+Codex metadata is in `.agents/plugins/marketplace.json` and
+`plugins/spec9/.codex-plugin/plugin.json`. Claude Code metadata is in
+`.claude-plugin/marketplace.json` and
+`plugins/spec9/.claude-plugin/plugin.json`.
+
+Claude Code installation from GitHub:
+
+```text
+/plugin marketplace add RoboNET/Spec9
+/plugin install spec9@spec9
+```
+
+Codex uses the repository marketplace at `.agents/plugins/marketplace.json`.
+The two catalogs are intentionally thin adapters; `SKILL.md` remains the common
+source of behavior.
+
+## Source-of-truth boundaries
+
+- Spec9 owns the format contract, checks, graph traversal, and review views.
+- A product profile declares legal kinds, relations, anchors, and slices.
+- Code owns internal structure and signatures.
+- OpenAPI, AsyncAPI, protobuf, DDL/migrations, JSON Schema, and design tools own
+  the shape of published boundaries; Spec9 connects those shapes to domain
+  meaning.
+- Git owns history. Spec9 does not create a parallel delta tree.
+
+## Development
 
 ```bash
 npm install
-npm link
-spec9 --spec-root /path/to/product/spec9 --product-root /path/to/product lint
-spec9 --spec-root /path/to/product/spec9 --product-root /path/to/product review --base HEAD
+npm run validate
+npm pack --dry-run
 ```
 
-Если команда запущена из корня продукта с `spec9/profile.yaml`, оба пути
-обнаруживаются автоматически. Из самого каталога спецификации достаточно
-`spec9 lint`; корнем продукта по умолчанию станет родительский каталог.
-
-Основные команды: `lint`, `graph`, `flow`, `context`, `trace`, `decision`,
-`doctor`, `quality`, `next`, `review`, `change`, `coverage`, `e2e`, `outcomes`
-и `candidates`. `spec9 --help` печатает полный список.
-
-## Граница ответственности
-
-- Spec9 владеет грамматикой, проверками, графом и представлениями для ревью.
-- Продуктовый профиль объявляет допустимые виды и отношения.
-- Код владеет внутренней структурой и сигнатурами.
-- OpenAPI, AsyncAPI, DDL, JSON Schema и дизайн-инструменты владеют формой
-  опубликованных границ; Spec9 связывает их с доменным смыслом.
-- Git хранит историю. Отдельного дерева дельт Spec9 не создаёт.
-
-## Навыки агента
-
-- `spec9-adopt` подключает движок к продукту, проектирует профиль и проверяет
-  первый вертикальный срез;
-- `spec9-author` создаёт и развивает доменные страницы, нормы, причинность,
-  границы, паттерны и ADR;
-- `spec9-implement` ведёт изменение от семантического среза к коду, evidence и
-  секции `Domain impact`;
-- `spec9-review` готовит временный top-down Markdown и передаёт его выбранному
-  annotator.
-
-Навыки находятся в `.agents/skills/`. Они используют CLI как источник
-семантических представлений и не дублируют его реализацию. Собственного UI или
-хранилища комментариев у Spec9 нет.
-
-Если среда агента не обнаруживает навыки из отдельного репозитория сама,
-каталоги можно опубликовать в её локальный skill path симлинками или упаковать
-в plugin без копирования их в каждый продукт. После обнаружения навыки можно
-вызывать явно:
-
-```text
-$spec9-adopt подключи Spec9 к этому продукту
-$spec9-author опиши процесс выпуска сертификата
-$spec9-implement реализуй требования ISS-004 и ISS-005
-$spec9-review проведи top-down ревью относительно main
-```
-
-Их `description` также рассчитаны на автоматический выбор по смыслу запроса.
-
-## Разработка
-
-```bash
-npm test
-npm run validate:skills
-```
-
-Ядро не должно содержать предположений о Tessera или конкретной раскладке
-продуктового репозитория. Интеграционные тесты продукта живут у продукта.
+The package and both plugin manifests share one release version. This is a
+distribution version, not a version field inside product specifications.
