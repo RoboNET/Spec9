@@ -18,7 +18,8 @@
   },
   "scripts": {
     "test": "node --test tools/*.test.mjs tools/adapters/*.test.mjs",
-    "validate:skill": "python3 /Users/robonet/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/spec9-review"
+    "validate:skill": "npm run validate:skills",
+    "validate:skills": "python3 /Users/robonet/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/spec9-adopt && python3 /Users/robonet/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/spec9-author && python3 /Users/robonet/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/spec9-implement && python3 /Users/robonet/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/spec9-review"
   },
   "dependencies": {
     "yaml": "^2.8.1"

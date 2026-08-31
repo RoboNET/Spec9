@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement with Spec9"
+  short_description: "Drive product changes from semantic requirements"
+  default_prompt: "Use $spec9-implement to implement this change from its Spec9 requirements and verify semantic closure."

@@ -9,6 +9,11 @@ Treat the `spec9` CLI as the review engine and an existing annotator as
 the presentation layer. Do not build or persist a separate review UI, comment
 database, semantic delta tree, or HTML renderer.
 
+Resolve `product-root`, `spec-root`, and the Git base before starting. Inspect
+the worktree so unrelated user changes are not mistaken for review findings.
+If the product has no `profile.yaml`, this skill does not invent one; use the
+adoption workflow first.
+
 ## Start the review
 
 Choose a Git base from the user's request or known MR target. For uncommitted
@@ -87,4 +92,7 @@ requesting alteration of an accepted ADR must become a new `replaces`/`revokes`
 decision rather than an edit to the old ADR.
 
 Finish with a short resolution summary: blocking comments, applied changes,
-open questions, and verification results.
+open questions, and verification results. When feedback turns into requested
+implementation work, hand the stable semantic handles and Git base to the
+Spec9 implementation workflow rather than expanding the review document into a
+task tracker.
