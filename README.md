@@ -53,6 +53,19 @@ Codex metadata is in `.agents/plugins/marketplace.json` and
 `.claude-plugin/marketplace.json` and
 `plugins/spec9/.claude-plugin/plugin.json`.
 
+### Codex
+
+Install the marketplace directly from GitHub, then install the shared plugin:
+
+```bash
+codex plugin marketplace add RoboNET/Spec9
+codex plugin add spec9@spec9
+```
+
+Start a new Codex thread after installation so the four Spec9 skills are loaded.
+
+### Claude Code
+
 Claude Code installation from GitHub:
 
 ```text
@@ -60,7 +73,6 @@ Claude Code installation from GitHub:
 /plugin install spec9@spec9
 ```
 
-Codex uses the repository marketplace at `.agents/plugins/marketplace.json`.
 The two catalogs are intentionally thin adapters; `SKILL.md` remains the common
 source of behavior.
 
