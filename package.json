@@ -1,0 +1,26 @@
+{
+  "name": "spec9",
+  "version": "0.1.0",
+  "description": "Domain-addressable specification engine and review tooling",
+  "type": "module",
+  "bin": {
+    "spec9": "tools/spec.mjs"
+  },
+  "exports": {
+    "./graph": "./tools/graph.mjs",
+    "./review": "./tools/semantic-review.mjs",
+    "./impact": "./tools/review-impact.mjs",
+    "./change": "./tools/change.mjs",
+    "./next": "./tools/next.mjs",
+    "./flow": "./tools/flow.mjs",
+    "./lint": "./tools/lint.mjs",
+    "./draft": "./tools/draft.mjs"
+  },
+  "scripts": {
+    "test": "node --test tools/*.test.mjs tools/adapters/*.test.mjs",
+    "validate:skill": "python3 /Users/robonet/.codex/skills/.system/skill-creator/scripts/quick_validate.py .agents/skills/spec9-review"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  }
+}
