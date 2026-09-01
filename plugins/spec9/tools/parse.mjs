@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseFrontmatter } from './yaml.mjs';
+import { isPathInside, resolveExistingWithinRoot } from './safe-path.mjs';
 import {
   maskZones, findLinks, findLinksInText, findHeadings, findOperators,
   findRuOperators, splitSentences, buildOffsetToLine,
@@ -12,24 +13,40 @@ import {
 export function findSpecFiles(root, sources) {
   const files = [];
   const warnings = [];
+  const visitedDirectories = new Set();
   const relative = (value) => path.relative(root, value).split(path.sep).join('/') || '.';
   function walk(directory) {
+    const realDirectory = fs.realpathSync(directory);
+    if (visitedDirectories.has(realDirectory)) return;
+    visitedDirectories.add(realDirectory);
     let entries;
     try { entries = fs.readdirSync(directory, { withFileTypes: true }); }
-    catch (error) { warnings.push({ path: relative(directory), reason: `не удалось прочитать директорию: ${error.message}` }); return; }
+    catch (error) { warnings.push({ path: relative(directory), reason: `cannot read directory: ${error.message}` }); return; }
     for (const entry of entries) {
       const full = path.join(directory, entry.name);
       let isDirectory = entry.isDirectory();
       let isFile = entry.isFile();
       if (entry.isSymbolicLink()) {
-        try { const stat = fs.statSync(full); isDirectory = stat.isDirectory(); isFile = stat.isFile(); }
-        catch (error) { warnings.push({ path: relative(full), reason: `битый симлинк или недоступная цель: ${error.message}` }); continue; }
+        const resolved = resolveExistingWithinRoot(root, relative(full), { label: 'specification source path' });
+        const stat = fs.statSync(resolved.real);
+        isDirectory = stat.isDirectory();
+        isFile = stat.isFile();
       }
       if (isDirectory) walk(full);
       else if (isFile && entry.name.endsWith('.md')) files.push(full);
     }
   }
-  for (const source of Array.isArray(sources) ? sources : []) walk(path.join(root, source));
+  for (const source of Array.isArray(sources) ? sources : []) {
+    if (typeof source !== 'string' || !source.trim() || path.isAbsolute(source)) throw new Error(`specification source root must be a non-empty relative path: ${JSON.stringify(source)}`);
+    const candidate = path.resolve(root, source);
+    if (!isPathInside(root, candidate)) throw new Error(`specification source root escapes the configured root: ${source}`);
+    // A legal kind directory may not exist until its first page is authored.
+    // Configured code/E2E/repository roots are different: those are executable
+    // inputs and fail closed in their respective consumers.
+    if (!fs.existsSync(candidate)) continue;
+    const resolved = resolveExistingWithinRoot(root, source, { kind: 'directory', label: 'specification source root' });
+    walk(resolved.absolute);
+  }
   return { files: files.sort(), warnings };
 }
 

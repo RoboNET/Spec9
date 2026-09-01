@@ -31,18 +31,18 @@ function setPath(target, dottedPath, value) {
  * Печатает profile-aware заготовку, но не записывает её: доменные связи,
  * требования и смысл остаются решением автора.
  */
-export function draftPage(repo, kind, qualifiedId, name = 'TODO: название') {
+export function draftPage(repo, kind, qualifiedId, name = 'TODO: name') {
   const dot = qualifiedId.indexOf('.');
   if (dot <= 0 || dot === qualifiedId.length - 1) {
-    throw new Error('id заготовки должен иметь вид context.id');
+    throw new Error('draft id must have the form context.id');
   }
   const context = qualifiedId.slice(0, dot);
   const id = qualifiedId.slice(dot + 1);
   const kindDef = repo.profile.kinds?.[kind];
-  if (!kindDef) throw new Error(`неизвестный kind "${kind}"`);
-  if (!repo.profile.contexts?.[context]) throw new Error(`неизвестный context "${context}"`);
+  if (!kindDef) throw new Error(`unknown kind "${kind}"`);
+  if (!repo.profile.contexts?.[context]) throw new Error(`unknown context "${context}"`);
   if (repo.entities.some((entity) => entity.id === id && entity.context === context)) {
-    throw new Error(`термин "${qualifiedId}" уже существует`);
+    throw new Error(`term "${qualifiedId}" already exists`);
   }
 
   const frontmatter = { id, kind, context, name };
@@ -52,7 +52,7 @@ export function draftPage(repo, kind, qualifiedId, name = 'TODO: названи�
 
   frontmatter.relations ??= {};
   for (const must of kindDef.must || []) {
-    if (must === 'outcomes') frontmatter.outcomes = ['TODO: основной исход', 'TODO: отказ'];
+    if (must === 'outcomes') frontmatter.outcomes = ['TODO: primary outcome', 'TODO: refusal'];
     if (must === 'producer') frontmatter.relations.producer = 'TODO:context.operation';
   }
 

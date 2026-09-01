@@ -40,11 +40,25 @@ DDD taxonomy.
    navigation escape hatch, never as the causal backbone.
 4. Declare source directories explicitly. Files outside them are not product
    pages.
-5. Define norm kinds and evidence expectations. A behavioral obligation should
-   normally have test evidence.
-6. Add graph slices and budgets only when the product needs different traversal
-   behavior. Unknown profile keys are errors, so do not invent configuration
-   that the engine does not consume.
+5. Limit code-derived candidate discovery with `code.roots` and `code.exclude`;
+   do not scan an umbrella workspace indiscriminately. Every declared root
+   must exist and resolve inside `product-root`; a missing root is an error.
+6. Define norm kinds and evidence expectations. Mark intentionally future norm
+   kinds with `state: planned`; a behavioral obligation should normally have
+   test evidence.
+7. For an umbrella workspace, declare every independently versioned Git root
+   under `repositories` with a stable ID and product-relative path. A path must
+   name the exact Git root. Review uses the same base/head ref in each one.
+8. Map `lifecycle_roles.proposed` and `lifecycle_roles.accepted` explicitly when
+   a decision kind has more than two statuses.
+9. Add graph slices and budgets only when the product needs different traversal
+   behavior. Set `budget.max_chars` when review payloads can grow beyond a
+   useful first pass. Unknown profile keys are errors, so do not invent
+   configuration that the engine does not consume.
+10. Curate roughly 8–12 `review.capabilities` only after the first vertical
+    slices exist. Each capability names a stable qualified `entrypoint` and a
+    short `members` list; it is a human navigation layer, not another place to
+    restate requirements.
 
 Read `<spec9-plugin>/docs/format.md` for supported frontmatter and
 `<spec9-plugin>/constitution.md` for source-of-truth rules when profile choices
@@ -86,8 +100,9 @@ npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> qual
 
 Treat `lint` failures as contract violations. Treat `quality` findings as
 review signals, not proven defects. If migrating OpenSpec, use `origins` as
-one-way provenance and `coverage --missing` to prove every legacy requirement
-has exactly one Spec9 owner; do not preserve two normative sources.
+one-way provenance and `coverage --missing` to distinguish requirements that
+are merely preserved, modeled as domain predicates, and verified by exact
+evidence; do not preserve two normative sources.
 
 Finish by documenting the product-local commands and the resolved source-of-
 truth boundaries. Do not create a parallel change log: Git owns history.

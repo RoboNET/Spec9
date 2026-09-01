@@ -23,6 +23,11 @@ requirements:
     subjects: [engine.lint-engine]
     evidence:
       code: [plugins/spec9/tools/lint.mjs#lint]
+  LNT-003:
+    kind: invariant
+    subjects: [engine.lint-engine]
+    evidence:
+      test: [plugins/spec9/tools/quality.test.mjs#LNT-003]
 ---
 
 # Structural lint engine
@@ -40,3 +45,10 @@ errors that produce a failing CLI exit status.
 [[engine.lint-engine|The lint engine]] MUST report an explicitly undefined
 decision-table row as a warning. [[engine.lint-engine|The lint engine]] MUST NOT
 invent an outcome for that row.
+
+### LNT-003 — Decisions do not become requirement containers
+
+[[engine.lint-engine|The lint engine]] MUST surface an ADR that contains
+requirements. [[engine.lint-engine|The lint engine]] MUST assign higher severity
+when a requirement names only the ADR itself as its subject. Domain deltas belong on affected domain pages;
+the ADR remains linked through `decided_by`.

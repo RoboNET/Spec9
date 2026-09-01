@@ -101,10 +101,10 @@ function resolveAnnotationPart(source, part) {
   if (identMatch) {
     const enumMembers = extractEnumMembers(source, identMatch[1]);
     if (enumMembers) return { values: enumMembers, unresolved: [] };
-    return { values: [], unresolved: [`аннотация возврата ссылается на "${text}" — не enum и не разобран`] };
+    return { values: [], unresolved: [`return annotation references "${text}", which is not an enum and could not be resolved`] };
   }
 
-  return { values: [], unresolved: [`аннотация возврата не разобрана: ${text.slice(0, 60)}`] };
+  return { values: [], unresolved: [`return annotation could not be resolved: ${text.slice(0, 60)}`] };
 }
 
 /**
@@ -165,9 +165,9 @@ function findEscapingSites(bodyLines) {
     if (RAISE_CALL_RE.test(line)) { escaping.push(`raise ${RAISE_CALL_RE.exec(line)[1]}`); continue; }
     if (RAISE_BARE_RE.test(line)) { escaping.push('raise'); continue; }
     if (RAISE_IDENT_RE.test(line)) { escaping.push(`raise ${RAISE_IDENT_RE.exec(line)[1]}`); continue; }
-    if (RAISE_ANY_RE.test(line)) { unresolved.push(`raise с неразобранным выражением: ${line.slice(0, 60)}`); continue; }
+    if (RAISE_ANY_RE.test(line)) { unresolved.push(`raise expression could not be resolved: ${line.slice(0, 60)}`); continue; }
     if (/^assert\b/.test(line)) { escaping.push(`assert ${line.slice(6).trim().slice(0, 60)}`); continue; }
-    if (/\beval\s*\(|\bexec\s*\(/.test(line)) { unresolved.push(`${line.slice(0, 60)} — динамический код, не разобрано`); }
+    if (/\beval\s*\(|\bexec\s*\(/.test(line)) { unresolved.push(`${line.slice(0, 60)} uses dynamic code and could not be resolved`); }
   }
   return { escaping, unresolved };
 }
@@ -191,7 +191,7 @@ export function extractOutcomes(source, symbol) {
   if (!retMatch) {
     // Отсутствие аннотации в Python — норма, а не дефект кода: честнее
     // сказать «мало знаю», чем сделать вид, что исходов нет (задача §10).
-    return { declared: [], escaping, confidence: 'shallow', unresolved: [...escapingUnresolved, 'аннотация возврата отсутствует'] };
+    return { declared: [], escaping, confidence: 'shallow', unresolved: [...escapingUnresolved, 'return annotation is missing'] };
   }
 
   const values = [];

@@ -22,6 +22,32 @@ requirements:
     evidence:
       schema: [spec9/profile.yaml]
       test: [plugins/spec9/tools/profile-registry.test.mjs#MANIFEST]
+  FMT-005:
+    kind: contract
+    subjects: [engine.product-profile]
+    evidence:
+      code:
+        - plugins/spec9/tools/openspec-coverage.mjs#configuredRoots
+        - plugins/spec9/tools/git-snapshot.mjs#configuredGitRepositories
+      test:
+        - plugins/spec9/tools/extended-commands.test.mjs#umbrella
+        - plugins/spec9/tools/semantic-review.test.mjs#REV-006
+  FMT-006:
+    kind: contract
+    subjects: [engine.product-profile]
+    evidence:
+      test: [plugins/spec9/tools/candidates-cmd.test.mjs#FMT-006]
+  FMT-007:
+    kind: contract
+    subjects: [engine.product-profile]
+    evidence:
+      test: [plugins/spec9/tools/extended-commands.test.mjs#FMT-007]
+  FMT-008:
+    kind: contract
+    subjects: [engine.product-profile]
+    evidence:
+      schema: [spec9/profile.yaml]
+      test: [plugins/spec9/tools/frontmatter.test.mjs#lifecycle]
 ---
 
 # Executable product profile
@@ -51,3 +77,35 @@ behavior for a key that has no registered implementation owner.
 
 [[engine.product-profile|The product profile]] MUST declare the legal contexts,
 kinds, relations, and evidence rules consumed by the engine.
+
+### FMT-005 — Umbrella repositories declare their roots
+
+[[engine.product-profile|The product profile]] MUST allow a private umbrella
+repository to declare multiple E2E registries and temporary OpenSpec migration
+roots without moving code or exposing private specifications downstream.
+[[engine.product-profile|The product profile]] MUST also declare each
+independently versioned Git root that contributes
+boundary sources or changed files to semantic review.
+
+### FMT-006 — Code discovery has an explicit scope
+
+[[engine.product-profile|The product profile]] MUST allow candidate discovery
+to declare code roots and exclusions. [[engine.product-profile|The product
+profile]] MUST NOT traverse a configured root that escapes the product root.
+[[engine.product-profile|The product profile]] MUST fail validation for a
+declared missing root rather than produce an empty green report.
+
+### FMT-007 — Migration completeness has explicit levels
+
+[[engine.product-profile|The product profile]] MUST distinguish a preserved
+legacy origin from a modeled domain predicate and from a requirement verified
+by exact evidence. [[engine.product-profile|The product profile]] MUST NOT
+present legacy-source deletion as semantic completion.
+
+### FMT-008 — Lifecycle meaning is explicit
+
+[[engine.product-profile|The product profile]] MUST map the semantic
+`proposed` and `accepted` lifecycle roles to product-local status names when a
+decision lifecycle contains additional terminal states.
+[[engine.product-profile|The product profile]] MUST NOT derive those roles from
+list positions.

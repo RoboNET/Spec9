@@ -1,12 +1,12 @@
-// Модель репозитория spec9: загрузка profile.yaml и всех спек-файлов,
-// индекс сущностей, разрешение квалифицированных ID, evidence-якорей,
-// реестр паттернов и вычисление обязательств применённого паттерна, построение
-// графа узлов/рёбер для `spec.mjs graph`.
+// Spec9 repository model: profile and specification loading, qualified identity
+// indexes, evidence resolution, pattern obligations, and graph construction.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYAML } from './yaml.mjs';
 import { findSpecFiles, parseSpecFile } from './parse.mjs';
+import { readBoundaryShape } from './boundary-adapters.mjs';
+import { resolveExistingWithinRoot } from './safe-path.mjs';
 
 /**
  * Загружает и разбирает profile.yaml.
@@ -14,7 +14,8 @@ import { findSpecFiles, parseSpecFile } from './parse.mjs';
  * @returns {Record<string, *>}
  */
 export function loadProfile(root) {
-  const text = fs.readFileSync(path.join(root, 'profile.yaml'), 'utf8');
+  const profile = resolveExistingWithinRoot(root, 'profile.yaml', { kind: 'file', label: 'profile' });
+  const text = fs.readFileSync(profile.real, 'utf8');
   return parseYAML(text, 1);
 }
 
@@ -29,11 +30,78 @@ export function loadProfile(root) {
  *   sourceWarnings: Array<{ path: string, reason: string }>,
  *   entities: Entity[],
  *   entitiesByContextId: Map<string, Entity>, entitiesById: Map<string, Entity[]>,
- *   requirementsById: Map<string, { file: import('./parse.mjs').SpecFile, req: import('./parse.mjs').Requirement }>,
+ *   requirementsById: RequirementIndex,
+ *   requirementsByLocalId: Map<string, Array<{ file: import('./parse.mjs').SpecFile, req: import('./parse.mjs').Requirement }>>,
  *   patternKind: string|null, decisionKind: string|null,
  *   proposedDecisionStatus: string|null, acceptedDecisionStatus: string|null,
  *   patternRegistry: Map<string, { entity: Entity, obligations: import('./parse.mjs').Requirement[] }> }} Repo
  */
+
+/**
+ * A canonical requirement index whose iteration exposes qualified IDs only.
+ * Unqualified lookup remains available when the local ID is unique, which
+ * gives existing repositories a migration path without making ambiguous IDs
+ * resolve nondeterministically.
+ */
+export class RequirementIndex extends Map {
+  constructor(entries = []) {
+    super(entries);
+    this.aliases = new Map();
+  }
+
+  addAlias(localId, qualifiedId) {
+    const current = this.aliases.get(localId) || [];
+    current.push(qualifiedId);
+    this.aliases.set(localId, current);
+  }
+
+  resolveKey(id) {
+    if (super.has(id)) return id;
+    const aliases = this.aliases.get(id) || [];
+    return aliases.length === 1 ? aliases[0] : null;
+  }
+
+  get(id) {
+    const key = this.resolveKey(id);
+    return key ? super.get(key) : undefined;
+  }
+
+  has(id) {
+    return this.resolveKey(id) !== null;
+  }
+
+  candidates(id) {
+    if (super.has(id)) return [id];
+    return [...(this.aliases.get(id) || [])];
+  }
+}
+
+export function qualifiedRequirementId(context, id) {
+  return String(id).includes('.') ? String(id) : `${context}.${id}`;
+}
+
+export function qualifiedEntityId(entity) {
+  return `${entity.context}.${entity.id}`;
+}
+
+export function resolveEntityKey(repo, id) {
+  const value = String(id);
+  if (value.includes('.')) {
+    const dot = value.indexOf('.');
+    return repo.entitiesByContextId.has(`${value.slice(0, dot)} ${value.slice(dot + 1)}`) ? value : null;
+  }
+  const candidates = repo.entitiesById.get(value) || [];
+  if (candidates.length > 1) throw new Error(`term "${value}" is ambiguous; use context.id`);
+  return candidates.length === 1 ? qualifiedEntityId(candidates[0]) : null;
+}
+
+export function resolveRequirement(repo, id) {
+  const found = repo.requirementsById.get(id);
+  if (found) return found;
+  const candidates = repo.requirementsById.candidates?.(id) || [];
+  if (candidates.length > 1) throw new Error(`requirement "${id}" is ambiguous; use context.ID`);
+  throw new Error(`requirement "${id}" not found`);
+}
 
 /**
  * Загружает весь репозиторий spec9: профиль, все спек-файлы (только внутри
@@ -58,7 +126,7 @@ export function loadRepo(root, productRoot = root) {
   // "нарушений нет", просканировав ноль файлов — тот самый класс ложной
   // зелёности, ради которого затевалось ревью.
   if (!Array.isArray(profile.sources) || profile.sources.length === 0) {
-    throw new Error('profile.yaml: ключ "sources" отсутствует или пуст — без него findSpecFiles молча просканирует ноль файлов; укажите список директорий со спеками, напр. sources: [terms, processes, patterns, decisions, events]');
+    throw new Error('profile.yaml: "sources" is missing or empty; declare the specification directories, for example sources: [terms, processes, patterns, decisions, events]');
   }
   const { files: paths, warnings: sourceWarnings } = findSpecFiles(root, profile.sources);
   const files = paths.map((p) => parseSpecFile(p, root));
@@ -86,8 +154,14 @@ export function loadRepo(root, productRoot = root) {
   const decisionLifecycle = decisionKind && Array.isArray(kinds[decisionKind]?.lifecycle)
     ? kinds[decisionKind].lifecycle.map(String)
     : [];
-  const proposedDecisionStatus = decisionLifecycle[0] || null;
-  const acceptedDecisionStatus = decisionLifecycle.at(-1) || null;
+  const lifecycleRoles = decisionKind && kinds[decisionKind]?.lifecycle_roles && typeof kinds[decisionKind].lifecycle_roles === 'object'
+    ? kinds[decisionKind].lifecycle_roles
+    : {};
+  const proposedDecisionStatus = lifecycleRoles.proposed ? String(lifecycleRoles.proposed) : decisionLifecycle[0] || null;
+  // A lifecycle may continue after acceptance (for example, proposed ->
+  // accepted -> superseded/rejected). Acceptance is the second state, not
+  // the terminal state. Two-state profiles keep the same result.
+  const acceptedDecisionStatus = lifecycleRoles.accepted ? String(lifecycleRoles.accepted) : decisionLifecycle[1] || decisionLifecycle.at(-1) || null;
 
   const patternRegistry = new Map();
   if (patternKind) {
@@ -101,17 +175,26 @@ export function loadRepo(root, productRoot = root) {
   // Индекс требований по ID — построен один раз здесь, а не линейным сканом
   // всех файлов на каждый вызов (docs/history/engine-audit-2026-08-30.md M9: `findRequirement` в slice.mjs
   // сканировал repo.files × file.requirements внутри поэрёберного цикла).
-  const requirementsById = new Map();
+  const requirementsById = new RequirementIndex();
+  const requirementsByLocalId = new Map();
   for (const file of files) {
+    const context = String(file.frontmatter?.context || '');
     for (const req of file.requirements) {
-      if (!req.id || requirementsById.has(req.id)) continue; // дубли ID — отдельная находка E-ID-DUP, здесь берём первый
-      requirementsById.set(req.id, { file, req });
+      if (!req.id || !context) continue;
+      const qualifiedId = qualifiedRequirementId(context, req.id);
+      req.localId = req.id;
+      req.qualifiedId = qualifiedId;
+      if (!requirementsByLocalId.has(req.id)) requirementsByLocalId.set(req.id, []);
+      requirementsByLocalId.get(req.id).push({ file, req });
+      if (Map.prototype.has.call(requirementsById, qualifiedId)) continue;
+      Map.prototype.set.call(requirementsById, qualifiedId, { file, req });
+      requirementsById.addAlias(req.id, qualifiedId);
     }
   }
 
   return {
     root, productRoot, specPathPrefix, profile, files, filesByPath, sourceWarnings,
-    entities, entitiesByContextId, entitiesById, requirementsById, patternKind,
+    entities, entitiesByContextId, entitiesById, requirementsById, requirementsByLocalId, patternKind,
     decisionKind, proposedDecisionStatus, acceptedDecisionStatus, patternRegistry,
   };
 }
@@ -195,36 +278,25 @@ function containsAsToken(haystack, needle) {
  * @returns {AnchorResolution}
  */
 export function resolveAnchor(anchor, root) {
-  const resolvedRoot = path.resolve(root);
-  const filePath = path.resolve(resolvedRoot, anchor.file);
-  // `path.join`/`path.resolve` не ограничены корнем сами по себе — якорь
-  // `code:../../etc/passwd` резольвился бы наружу репозитория молча
-  // (docs/history/engine-audit-2026-08-30.md H5). Разрешённый путь обязан остаться ВНУТРИ resolvedRoot.
-  const rel = path.relative(resolvedRoot, filePath);
-  if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
-    return { ok: false, reason: `якорь выходит за пределы корня репозитория: ${anchor.file}` };
-  }
-  if (!fs.existsSync(filePath)) return { ok: false, reason: `файл не найден: ${anchor.file}` };
-  let stat;
+  let resolved;
   try {
-    stat = fs.statSync(filePath);
+    resolved = resolveExistingWithinRoot(root, anchor.file, { kind: 'file', label: 'anchor' });
   } catch (e) {
-    return { ok: false, reason: `не удалось прочитать файл: ${e.message}` };
+    return { ok: false, reason: e.message };
   }
-  if (!stat.isFile()) {
-    // fs.existsSync истинен и для директорий: code:crates/ резольвился бы
-    // как "существующий файл" (docs/history/engine-audit-2026-08-30.md H5).
-    return { ok: false, reason: `путь не является файлом: ${anchor.file}` };
+  if (anchor.type === 'schema') {
+    const boundary = readBoundaryShape(anchor, root);
+    return boundary.status === 'ok' ? { ok: true, reason: null } : { ok: false, reason: boundary.error };
   }
   if (anchor.symbol) {
     let content;
     try {
-      content = fs.readFileSync(filePath, 'utf8');
+      content = fs.readFileSync(resolved.real, 'utf8');
     } catch (e) {
-      return { ok: false, reason: `не удалось прочитать файл: ${e.message}` };
+      return { ok: false, reason: `cannot read file: ${e.message}` };
     }
     if (!containsAsToken(content, anchor.symbol)) {
-      return { ok: false, reason: `символ "${anchor.symbol}" не найден в ${anchor.file}` };
+      return { ok: false, reason: `symbol "${anchor.symbol}" not found in ${anchor.file}` };
     }
   }
   return { ok: true, reason: null };
@@ -289,10 +361,8 @@ export function buildGraph(repo) {
   /** @type {GraphEdge[]} */
   const edges = [];
 
-  const entityByPathId = new Map();
   for (const e of repo.entities) {
-    nodes.push({ id: e.id, kind: e.kind, context: e.context, path: e.path, name: e.name });
-    entityByPathId.set(`${e.file.path} ${e.id}`, e);
+    nodes.push({ id: qualifiedEntityId(e), localId: e.id, kind: e.kind, context: e.context, path: e.path, name: e.name });
   }
 
   for (const file of repo.files) {
@@ -303,32 +373,34 @@ export function buildGraph(repo) {
 
     for (const req of file.requirements) {
       if (!req.id) continue;
-      nodes.push({ id: req.id, kind: 'норма', context: fm.context, path: file.path, name: req.title });
+      const reqId = req.qualifiedId || qualifiedRequirementId(fm.context, req.id);
+      nodes.push({ id: reqId, kind: 'норма', context: fm.context, path: file.path, name: req.title });
     }
 
     for (const link of file.links) {
       const resolution = resolveLink(link, fm.context, repo);
       if (resolution.unresolved) continue;
       const type = resolution.target.kind === repo.decisionKind ? 'решение' : `relation:${link.relation || 'references'}`;
-      edges.push({ from: fm.id, to: resolution.target.id, type });
+      edges.push({ from: qualifiedEntityId(fileEntity), to: qualifiedEntityId(resolution.target), type });
     }
 
     for (const req of file.requirements) {
       if (!req.id) continue;
+      const reqId = req.qualifiedId || qualifiedRequirementId(fm.context, req.id);
       for (const subject of req.subjects || []) {
         if (subject === 'application') continue;
         const resolution = resolveLink({ ref: subject }, fm.context, repo);
-        if (resolution.target) edges.push({ from: req.id, to: resolution.target.id, type: 'субъект' });
+        if (resolution.target) edges.push({ from: reqId, to: qualifiedEntityId(resolution.target), type: 'субъект' });
       }
       if (!req.isCanonical) continue;
       for (const decisionRef of req.decidedBy || []) {
         const resolution = resolveLink({ ref: decisionRef }, fm.context, repo);
         if (resolution.target?.kind === repo.decisionKind) {
-          edges.push({ from: req.id, to: resolution.target.id, type: 'решение', relation: 'decided_by' });
+          edges.push({ from: reqId, to: qualifiedEntityId(resolution.target), type: 'решение', relation: 'decided_by' });
         }
       }
       for (const anchor of req.evidenceAnchors) {
-        edges.push({ from: req.id, to: anchor.target, type: 'evidence', anchorType: anchor.type });
+        edges.push({ from: reqId, to: anchor.target, type: 'evidence', anchorType: anchor.type });
       }
     }
 
@@ -337,7 +409,7 @@ export function buildGraph(repo) {
     // здесь fm.id, не req.id. Без этого цикла `spec.mjs why` не находит термин
     // по type:-якорю, объявленному только в frontmatter (а не в теле Evidence).
     for (const anchor of file.frontmatterAnchors) {
-      edges.push({ from: fm.id, to: anchor.target, type: 'evidence', anchorType: anchor.type });
+      edges.push({ from: qualifiedEntityId(fileEntity), to: anchor.target, type: 'evidence', anchorType: anchor.type });
     }
 
     const applies = Array.isArray(fm.applies) ? fm.applies : [];
@@ -345,12 +417,12 @@ export function buildGraph(repo) {
       if (!app || !app.pattern) continue;
       const reg = repo.patternRegistry.get(app.pattern);
       if (!reg) continue;
-      edges.push({ from: fm.id, to: reg.entity.id, type: 'применённый-паттерн' });
+      edges.push({ from: qualifiedEntityId(fileEntity), to: qualifiedEntityId(reg.entity), type: 'применённый-паттерн' });
     }
 
     for (const c of file.conformance) {
       for (const anchor of c.anchors) {
-        edges.push({ from: fm.id, to: anchor.target, type: 'evidence', anchorType: anchor.type, pattern: c.pattern, normId: c.normId });
+        edges.push({ from: qualifiedEntityId(fileEntity), to: anchor.target, type: 'evidence', anchorType: anchor.type, pattern: c.pattern, normId: c.normId });
       }
     }
   }

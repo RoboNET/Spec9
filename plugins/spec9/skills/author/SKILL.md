@@ -56,7 +56,8 @@ semantic graph edges in `relations`; a wiki link alone is not a relation.
 
 For each requirement:
 
-1. assign a stable human-chosen ID and matching Markdown heading;
+1. assign a stable human-chosen local ID and matching Markdown heading; refer
+   to it externally as `context.REQ-ID`;
 2. choose the norm kind from the profile;
 3. name every subject with a qualified ID and a nearby typed wiki-link;
 4. write one normative thought per sentence with only `MUST`, `MUST NOT`, or
@@ -69,7 +70,10 @@ An anchor proves that a target still exists; it does not prove semantic
 conformance. Tests are behavioral evidence. The spec owns names, definitions,
 invariants, and domain relations; code owns internal fields and signatures;
 OpenAPI, AsyncAPI, protobuf, DDL/migrations, configuration schemas, and design
-tools own the shape of published boundaries.
+tools own the shape of published boundaries. Rust and TypeScript source may
+own a boundary when no separate IDL exists. Use `schema:` only for a format
+with a supported semantic adapter; unsupported formats fail closed. Prefer a
+named type, callable, table, component, or heading over a whole-file anchor.
 
 ## Preserve causal and decision semantics
 
@@ -79,7 +83,8 @@ network, queue, external, or human steps. `not-applicable` requires a reason.
 
 Never rewrite or delete an accepted ADR to change a choice. Add a new ADR with
 `replaces` or `revokes`, declare broad `affects`, and connect only norms caused
-by that choice through `decided_by`.
+by that choice through `decided_by`. Keep those norms on the affected domain
+pages; an ADR is rationale and lifecycle, not a requirement container.
 
 Never auto-add an outcome found in code. A mismatch requires a human decision:
 change the spec, change the implementation, or classify it as non-domain.
@@ -90,7 +95,7 @@ Run the narrowest useful views while authoring, then the repository checks:
 
 ```bash
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> flow <context.id>
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> trace <requirement-id>
+npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> trace <context.REQ-ID>
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> lint
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> quality --all
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> doctor --strict

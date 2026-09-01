@@ -14,11 +14,7 @@ import { buildRustWorkspaceResolver } from './rust-workspace.mjs';
  * @returns {{ file: import('./parse.mjs').SpecFile, req: import('./parse.mjs').Requirement }|null}
  */
 function findRequirement(repo, reqId) {
-  for (const file of repo.files) {
-    const req = file.requirements.find((r) => r.id === reqId);
-    if (req) return { file, req };
-  }
-  return null;
+  return repo.requirementsById.get(reqId) || null;
 }
 
 /**
@@ -32,13 +28,13 @@ function findRequirement(repo, reqId) {
  */
 function formatDiscrepancy(reqId, symbol, variant) {
   return [
-    `РАСХОЖДЕНИЕ  ${reqId}  ${symbol}`,
-    `  исход в коде, отсутствует в спеке: ${variant}`,
-    '  разрешается ОДНИМ ИЗ:',
-    '    (a) исход доменный → добавить в Outcomes и завести сценарий с evidence',
-    '    (b) исход не должен возникать → изменить код',
-    '    (c) исход не доменный → внести категорию в non_domain_outcomes профиля',
-    '  выбор фиксируется человеком; авто-исправления нет',
+    `DISCREPANCY  ${reqId}  ${symbol}`,
+    `  code outcome missing from the specification: ${variant}`,
+    '  resolve in exactly one way:',
+    '    (a) domain outcome → add it to Outcomes and attach scenario evidence',
+    '    (b) impossible outcome → change the code',
+    '    (c) non-domain outcome → add its category to profile.non_domain_outcomes',
+    '  a human records the choice; there is no automatic fix',
   ].join('\n');
 }
 
@@ -62,9 +58,10 @@ function formatDiscrepancy(reqId, symbol, variant) {
 export function cmdOutcomes(repo, reqId) {
   const found = findRequirement(repo, reqId);
   if (!found) {
-    return { text: `требование "${reqId}" не найдено — ПРОВЕРКА НЕ СОСТОЯЛАСЬ`, hasDiscrepancy: false, status: 'unchecked' };
+    return { text: `Requirement "${reqId}" was not found — CHECK NOT PERFORMED`, hasDiscrepancy: false, status: 'unchecked' };
   }
   const { file, req } = found;
+  reqId = req.qualifiedId || `${file.frontmatter.context}.${req.id}`;
   // docs/history/engine-audit-2026-08-30.md M17: профиль требует `code:` именно во frontmatter термина
   // (`kinds.операция.anchors.required: [code, test]`) — команда читала
   // только `req.evidenceAnchors` (Evidence-строки ПОД заголовком требования)
@@ -72,12 +69,13 @@ export function cmdOutcomes(repo, reqId) {
   // с символом", хотя якорь был, просто во frontmatter файла термина.
   const codeAnchors = [...req.evidenceAnchors, ...file.frontmatterAnchors].filter((a) => a.type === 'code' && a.symbol);
   if (codeAnchors.length === 0) {
-    return { text: `у требования ${reqId} нет code:-якоря с символом (ни в Evidence требования, ни в frontmatter anchors: термина) — сверять нечего — ПРОВЕРКА НЕ СОСТОЯЛАСЬ`, hasDiscrepancy: false, status: 'unchecked' };
+    return { text: `Requirement ${reqId} has no code anchor with a symbol in requirement evidence or page anchors — CHECK NOT PERFORMED`, hasDiscrepancy: false, status: 'unchecked' };
   }
 
   const nonDomain = new Set(repo.profile.non_domain_outcomes || []);
   const declaredOutcomes = req.outcomes ? req.outcomes.values : [];
-  const outcomeMap = (file.frontmatter && file.frontmatter.outcome_map && file.frontmatter.outcome_map[reqId]) || null;
+  const outcomeMap = (file.frontmatter && file.frontmatter.outcome_map
+    && (file.frontmatter.outcome_map[reqId] || file.frontmatter.outcome_map[req.id])) || null;
 
   const blocks = [];
   const resolveRustType = buildRustWorkspaceResolver(repo.productRoot);
@@ -94,15 +92,15 @@ export function cmdOutcomes(repo, reqId) {
   for (const anchor of codeAnchors) {
     const absPath = path.join(repo.productRoot, anchor.file);
     if (!fs.existsSync(absPath)) {
-      blocks.push(`якорь ${anchor.type}:${anchor.target} — файл не найден: ${anchor.file} — ПРОВЕРКА НЕ СОСТОЯЛАСЬ`);
+      blocks.push(`Anchor ${anchor.type}:${anchor.target} — file not found: ${anchor.file} — CHECK NOT PERFORMED`);
       anyUnchecked = true;
       continue;
     }
     const adapter = adapterForFile(anchor.file);
     if (!adapter) {
       blocks.push(
-        `якорь ${anchor.type}:${anchor.target} — нет адаптера для языка файла ${anchor.file} ` +
-        `(поддерживаются: ${supportedExtensions().join(', ')}) — ПРОВЕРКА НЕ СОСТОЯЛАСЬ`,
+        `Anchor ${anchor.type}:${anchor.target} — no language adapter for ${anchor.file} ` +
+        `(supported: ${supportedExtensions().join(', ')}) — CHECK NOT PERFORMED`,
       );
       anyUnchecked = true;
       continue;
@@ -116,7 +114,7 @@ export function cmdOutcomes(repo, reqId) {
         : {},
     );
     if (extraction === null) {
-      blocks.push(`символ "${anchor.symbol}" в ${anchor.file} не найден либо не разобран — сверять нечего — ПРОВЕРКА НЕ СОСТОЯЛАСЬ`);
+      blocks.push(`Symbol "${anchor.symbol}" was not found or parsed in ${anchor.file} — CHECK NOT PERFORMED`);
       anyUnchecked = true;
       continue;
     }
@@ -126,14 +124,14 @@ export function cmdOutcomes(repo, reqId) {
     // с Outcomes (у них нет имени варианта для outcome_map), но обязаны
     // попасть в вывод: конституция §10 требует не терять их молча.
     if (escaping.length > 0 || unresolved.length > 0) {
-      const infoLines = [`СВЕДЕНИЯ ОБ ИСХОДАХ  ${reqId}  ${anchor.symbol}  (confidence: ${confidence})`];
+      const infoLines = [`OUTCOME INFORMATION  ${reqId}  ${anchor.symbol}  (confidence: ${confidence})`];
       if (escaping.length > 0) {
-        infoLines.push(`  исходы мимо типа (escaping): ${escaping.join(', ')}`);
-        infoLines.push('  для них ветка (b) почти всегда верна: убрать бросок из кода');
+        infoLines.push(`  escaping outcomes: ${escaping.join(', ')}`);
+        infoLines.push('  option (b) usually applies: remove the escaping throw from code');
       }
       if (unresolved.length > 0) {
-        infoLines.push(`  не разобрано: ${unresolved.join(', ')}`);
-        infoLines.push('  достоверность вывода ниже — проверьте эти места вручную');
+        infoLines.push(`  unresolved: ${unresolved.join(', ')}`);
+        infoLines.push('  confidence is lower; review these paths manually');
       }
       blocks.push(infoLines.join('\n'));
       // A mapped subset is not a complete check when the adapter explicitly
@@ -145,11 +143,11 @@ export function cmdOutcomes(repo, reqId) {
     if (!outcomeMap) {
       blocks.push(
         [
-          `СОПОСТАВЛЕНИЕ ВРУЧНУЮ  ${reqId}  ${anchor.symbol}`,
+          `MANUAL MAPPING  ${reqId}  ${anchor.symbol}`,
           `  confidence: ${confidence}`,
-          `  исходы кода:   ${variants.join(', ') || '(нет вариантов)'}`,
-          `  исходы спеки:  ${declaredOutcomes.join(', ') || '(Outcomes не объявлены)'}`,
-          '  явной карты (frontmatter.outcome_map) для этого требования нет — сопоставьте вручную',
+          `  code outcomes: ${variants.join(', ') || '(no variants)'}`,
+          `  spec outcomes: ${declaredOutcomes.join(', ') || '(Outcomes not declared)'}`,
+          '  this requirement has no explicit frontmatter.outcome_map; compare manually',
         ].join('\n'),
       );
       anyUnchecked = true; // без карты автоматической сверки не было — это тоже не "проверено"
@@ -163,8 +161,8 @@ export function cmdOutcomes(repo, reqId) {
     // (воспроизведено Codex на реальном outcomes REV-002, см. docs/history/engine-audit-2026-08-30.md C3).
     if (variants.length === 0) {
       blocks.push(
-        `якорь ${anchor.type}:${anchor.target} (символ "${anchor.symbol}") — адаптер не извлёк ни одного ` +
-        `варианта исхода (confidence: ${confidence}) — ПРОВЕРКА НЕ СОСТОЯЛАСЬ`,
+        `Anchor ${anchor.type}:${anchor.target} (symbol "${anchor.symbol}") — the adapter extracted no ` +
+        `outcome variants (confidence: ${confidence}) — CHECK NOT PERFORMED`,
       );
       anyUnchecked = true;
       continue;
@@ -194,6 +192,6 @@ export function cmdOutcomes(repo, reqId) {
 
   const text = blocks.length > 0
     ? blocks.join('\n\n')
-    : `расхождений нет: все варианты code:-якорей ${reqId} сопоставлены с Outcomes`;
+    : `No discrepancies: every code outcome for ${reqId} is mapped to Outcomes.`;
   return { text, hasDiscrepancy, status };
 }

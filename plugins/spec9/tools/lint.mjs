@@ -1,7 +1,7 @@
 // Проверки линта spec9 (см. constitution.md и задание команды). Каждая
 // функция check* возвращает список находок; lint(repo) их собирает и сортирует.
 
-import { resolveLink, resolveAnchor, computeObligations } from './graph.mjs';
+import { resolveLink, resolveAnchor, computeObligations, resolveEntityKey } from './graph.mjs';
 import { analyzeCoverage, formatCombo, countUndefinedOnlyCoverage } from './combinations.mjs';
 import { checkProfileKeyOwnership } from './profile-registry.mjs';
 import { decisionCycles, decisionIndex, effectiveDecisionStatus } from './decision.mjs';
@@ -18,8 +18,38 @@ import { decisionCycles, decisionIndex, effectiveDecisionStatus } from './decisi
  * @param {string} message
  * @returns {Finding}
  */
+const DIAGNOSTIC_SUMMARIES = {
+  'E-FRONTMATTER': 'Frontmatter is invalid or misses required fields.',
+  'E-KIND-UNKNOWN': 'The declared kind is not present in profile.yaml.',
+  'E-ID-DUP': 'An identity is duplicated inside its context.',
+  'E-LINK-UNRESOLVED': 'A typed or navigation link cannot be resolved.',
+  'E-LINK-CROSS-CONTEXT': 'A cross-context link must use context.id.',
+  'E-NORM-NO-SUBJECT': 'A normative statement has no explicit subject.',
+  'E-REQ-NO-NORM': 'A requirement has no normative statement.',
+  'E-SUBJECT-UNRESOLVED': 'A requirement subject cannot be resolved.',
+  'E-SUBJECT-NOT-IN-PROSE': 'A declared subject is not linked from the requirement prose.',
+  'E-NORM-OUTSIDE-REQ': 'A normative statement is outside a declared requirement section.',
+  'E-EVIDENCE-MISSING': 'A requirement lacks evidence required by its norm kind.',
+  'E-ANCHOR-BROKEN': 'An evidence anchor is broken or imprecise.',
+  'E-DECIDED-BY-QUALIFIED': 'A decision reference must use context.id.',
+  'E-DECIDED-BY-UNRESOLVED': 'A decision reference cannot be resolved.',
+  'E-REQ-PREFIX': 'The requirement prefix is not allowed in this context.',
+  'W-NORM-COORDINATION': 'A normative sentence may contain more than one obligation.',
+  'W-PROCESS-NO-TRIGGER': 'A process has no causal input.',
+  'W-PROCESS-NO-NEXT': 'A process has no causal output.',
+  'W-COMBINATIONS-UNDEFINED-ROW': 'A combination row is explicitly undefined.',
+  'W-COMBINATIONS-UNDEFINED-COVERAGE': 'Some combinations are covered only by undefined rows.',
+};
+
+function englishDiagnostic(code, original) {
+  if (DIAGNOSTIC_SUMMARIES[code]) return DIAGNOSTIC_SUMMARIES[code];
+  const label = code.slice(2).toLowerCase().replaceAll('-', ' ');
+  const values = [...String(original).matchAll(/"([^"]+)"/g)].map((match) => match[1]).slice(0, 4);
+  return `${code.startsWith('E-') ? 'Invalid specification' : 'Review required'}: ${label}.${values.length ? ` Values: ${values.join(', ')}.` : ''}`;
+}
+
 function mk(path, line, level, code, message) {
-  return { path, line, level, code, message };
+  return { path, line, level, code, message: englishDiagnostic(code, message) };
 }
 
 /**
@@ -158,8 +188,7 @@ function checkKindShape(repo) {
 }
 
 /**
- * E-ID-DUP — id термина (в рамках контекста) или ID требования (глобально)
- * встречается дважды.
+ * E-ID-DUP — a term or requirement ID occurs twice inside one context.
  * @param {import('./graph.mjs').Repo} repo
  * @returns {Finding[]}
  */
@@ -182,15 +211,17 @@ function checkIdDup(repo) {
 
   const reqSeen = new Map();
   for (const file of repo.files) {
+    const context = String(file.frontmatter?.context || '');
     for (const req of file.requirements) {
       if (!req.id) continue;
-      if (!reqSeen.has(req.id)) reqSeen.set(req.id, []);
-      reqSeen.get(req.id).push({ path: file.path, line: req.headingLine });
+      const key = `${context}.${req.id}`;
+      if (!reqSeen.has(key)) reqSeen.set(key, []);
+      reqSeen.get(key).push({ path: file.path, line: req.headingLine });
     }
   }
   for (const [id, locs] of reqSeen) {
     if (locs.length < 2) continue;
-    for (const loc of locs) out.push(mk(loc.path, loc.line, 'ERROR', 'E-ID-DUP', `ID требования "${id}" встречается дважды`));
+    for (const loc of locs) out.push(mk(loc.path, loc.line, 'ERROR', 'E-ID-DUP', `requirement ID "${id}" occurs more than once in its context`));
   }
 
   return out;
@@ -821,6 +852,19 @@ function checkDecisionAlternative(repo) {
 
 function checkLifecycle(repo) {
   const out = [];
+  for (const [kind, definition] of Object.entries(repo.profile.kinds || {})) {
+    if (!Array.isArray(definition?.lifecycle)) continue;
+    const roles = definition.lifecycle_roles;
+    if (definition.lifecycle.length > 2 && (!roles || typeof roles !== 'object' || !roles.proposed || !roles.accepted)) {
+      out.push(mk('profile.yaml', 1, 'ERROR', 'E-LIFECYCLE-ROLES', `kind "${kind}" must declare lifecycle_roles.proposed and lifecycle_roles.accepted`));
+      continue;
+    }
+    for (const [role, status] of Object.entries(roles || {})) {
+      if (!definition.lifecycle.includes(status)) {
+        out.push(mk('profile.yaml', 1, 'ERROR', 'E-LIFECYCLE-ROLES', `lifecycle role "${role}" points to unknown status "${status}"`));
+      }
+    }
+  }
   for (const file of repo.files) {
     if (!hasValidFrontmatter(file)) continue;
     const lifecycle = repo.profile.kinds?.[file.frontmatter.kind]?.lifecycle;
@@ -828,6 +872,37 @@ function checkLifecycle(repo) {
     const status = file.frontmatter.status;
     if (typeof status !== 'string' || !lifecycle.includes(status)) {
       out.push(mk(file.path, findFrontmatterLine(file, /^status:/) ?? file.frontmatterStartLine, 'ERROR', 'E-LIFECYCLE-STATUS', `status должен быть одним из [${lifecycle.join(', ')}], получено ${JSON.stringify(status)}`));
+    }
+  }
+  return out;
+}
+
+function checkReviewCapabilities(repo) {
+  const configured = repo.profile.review?.capabilities;
+  if (configured === undefined) return [];
+  if (!Array.isArray(configured)) return [mk('profile.yaml', 1, 'ERROR', 'E-REVIEW-CAPABILITIES', 'review.capabilities must be a list')];
+  const out = [];
+  const ids = new Set();
+  for (const capability of configured) {
+    if (!capability || typeof capability !== 'object' || Array.isArray(capability)) {
+      out.push(mk('profile.yaml', 1, 'ERROR', 'E-REVIEW-CAPABILITIES', 'each review capability must be an object'));
+      continue;
+    }
+    const id = capability.id;
+    if (typeof id !== 'string' || !/^[a-z][a-z0-9-]*$/u.test(id) || ids.has(id)) {
+      out.push(mk('profile.yaml', 1, 'ERROR', 'E-REVIEW-CAPABILITIES', `invalid or duplicate capability id: ${JSON.stringify(id)}`));
+    } else ids.add(id);
+    if (typeof capability.title !== 'string' || !capability.title.trim()) out.push(mk('profile.yaml', 1, 'ERROR', 'E-REVIEW-CAPABILITIES', `capability ${JSON.stringify(id)} has no title`));
+    if (typeof capability.entrypoint !== 'string') {
+      out.push(mk('profile.yaml', 1, 'ERROR', 'E-REVIEW-CAPABILITIES', `capability ${JSON.stringify(id)} has no entrypoint`));
+      continue;
+    }
+    const handles = [capability.entrypoint, ...(Array.isArray(capability.members) ? capability.members : [])];
+    if (capability.members !== undefined && !Array.isArray(capability.members)) out.push(mk('profile.yaml', 1, 'ERROR', 'E-REVIEW-CAPABILITIES', `capability ${id}.members must be a list`));
+    for (const handle of handles) {
+      if (typeof handle !== 'string' || !handle.includes('.') || !resolveEntityKey(repo, handle)) {
+        out.push(mk('profile.yaml', 1, 'ERROR', 'E-REVIEW-CAPABILITIES', `capability ${id} references an unresolved qualified handle: ${JSON.stringify(handle)}`));
+      }
     }
   }
   return out;
@@ -1341,6 +1416,7 @@ const ALL_CHECKS = [
   checkObligationEvidence,
   checkDecisionAlternative,
   checkLifecycle,
+  checkReviewCapabilities,
   checkDecisionGraph,
   checkDecisionOrphan,
   checkTermOrphan,

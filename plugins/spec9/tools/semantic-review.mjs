@@ -1,4 +1,5 @@
 import { buildReviewImpact } from './review-impact.mjs';
+import { diffBoundaryShapes, readBoundaryShape } from './boundary-adapters.mjs';
 
 const OMITTED_PROPERTIES = new Set(['id', 'context', 'kind', 'name', 'status', 'anchors', 'relations', 'requirements']);
 
@@ -50,6 +51,7 @@ function semanticSnapshot(repo) {
   const requirements = new Map();
   const relations = new Map();
   const anchors = new Map();
+  const boundaryShapes = new Map();
 
   for (const entity of repo.entities) {
     const file = entity.file;
@@ -72,6 +74,7 @@ function semanticSnapshot(repo) {
     for (const anchor of file.frontmatterAnchors) {
       const key = anchorKey(id, anchor);
       anchors.set(key, { key, owner: id, ownerType: 'term', type: anchor.type, target: anchor.target, context: entity.context });
+      if (anchor.type === 'schema') boundaryShapes.set(key, { key, owner: id, target: anchor.target, context: entity.context, ...readBoundaryShape(anchor, repo.productRoot) });
     }
 
     for (const req of file.requirements) {
@@ -79,8 +82,9 @@ function semanticSnapshot(repo) {
       const norms = file.norms
         .filter((norm) => norm.startLine >= req.sectionStart && norm.startLine < req.sectionEnd)
         .map((norm) => normalizeText(norm.sentenceText));
-      requirements.set(req.id, {
-        id: req.id,
+      const reqId = req.qualifiedId || `${entity.context}.${req.id}`;
+      requirements.set(reqId, {
+        id: reqId,
         context: entity.context,
         owner: id,
         path: entity.path,
@@ -96,14 +100,15 @@ function semanticSnapshot(repo) {
         prose: requirementProse(file, req),
       });
       for (const anchor of req.evidenceAnchors) {
-        const key = anchorKey(req.id, anchor);
-        anchors.set(key, { key, owner: req.id, ownerType: 'requirement', type: anchor.type, target: anchor.target, context: entity.context });
+        const key = anchorKey(reqId, anchor);
+        anchors.set(key, { key, owner: reqId, ownerType: 'requirement', type: anchor.type, target: anchor.target, context: entity.context });
+        if (anchor.type === 'schema') boundaryShapes.set(key, { key, owner: reqId, target: anchor.target, context: entity.context, ...readBoundaryShape(anchor, repo.productRoot) });
       }
     }
   }
 
   const profile = Object.fromEntries(Object.entries(repo.profile).filter(([key]) => key !== 'profile').map(([key, value]) => [key, canonical(value)]));
-  return { profile, terms, requirements, relations, anchors };
+  return { profile, terms, requirements, relations, anchors, boundaryShapes };
 }
 
 function differencePaths(before, after, prefix) {
@@ -140,7 +145,7 @@ function boundaryKind(kind, baseRepo, headRepo) {
 
 function collectContexts(diff) {
   const contexts = new Set();
-  for (const group of [diff.terms, diff.requirements, diff.relations, diff.anchors]) {
+  for (const group of [diff.terms, diff.requirements, diff.relations, diff.anchors, diff.boundaryShapes]) {
     for (const item of [...group.added, ...group.removed]) if (item.context) contexts.add(item.context);
     for (const item of group.modified || []) if (item.after.context || item.before.context) contexts.add(item.after.context || item.before.context);
   }
@@ -154,6 +159,14 @@ export function buildSemanticDiff(baseRepo, headRepo, { base = 'base', head = 'w
   const requirements = mapDiff(before.requirements, after.requirements, ['owner', 'kind', 'title', 'subjects', 'outcomes', 'partitions', 'origins', 'decidedBy', 'norms', 'prose']);
   const relations = mapDiff(before.relations, after.relations);
   const anchors = mapDiff(before.anchors, after.anchors);
+  const boundaryShapeMap = mapDiff(before.boundaryShapes, after.boundaryShapes, ['status', 'adapter', 'shape', 'error']);
+  const boundaryShapes = {
+    ...boundaryShapeMap,
+    modified: boundaryShapeMap.modified.map((change) => ({
+      ...change,
+      semantic: diffBoundaryShapes(change.before, change.after),
+    })),
+  };
   const profileFields = differencePaths(before.profile, after.profile, '');
 
   const decisions = [];
@@ -185,10 +198,10 @@ export function buildSemanticDiff(baseRepo, headRepo, { base = 'base', head = 'w
       return (from && boundaryKind(from.kind, baseRepo, headRepo)) || (to && boundaryKind(to.kind, baseRepo, headRepo));
     });
 
-  const breaking = terms.removed.length || requirements.removed.length || decisions.some((item) => item.severity === 'high') || boundaryTerms.some((item) => item.change === 'removed') || boundaryRelations.some((item) => item.change === 'removed');
-  const significant = terms.added.length || terms.modified.length || requirements.added.length || requirements.modified.length || relations.added.length || relations.removed.length || anchors.added.length || anchors.removed.length || profileFields.length;
+  const breaking = terms.removed.length || requirements.removed.length || decisions.some((item) => item.severity === 'high') || boundaryTerms.some((item) => item.change === 'removed') || boundaryRelations.some((item) => item.change === 'removed') || boundaryShapes.removed.length || boundaryShapes.modified.some((item) => item.semantic.breaking);
+  const significant = terms.added.length || terms.modified.length || requirements.added.length || requirements.modified.length || relations.added.length || relations.removed.length || anchors.added.length || anchors.removed.length || boundaryShapes.added.length || boundaryShapes.modified.length || profileFields.length;
   const risk = breaking ? 'high' : significant ? 'medium' : 'low';
-  const diff = { base, head, risk, profileFields, terms, requirements, relations, anchors, decisions, boundaries: { terms: boundaryTerms, relations: boundaryRelations } };
+  const diff = { base, head, risk, profileFields, terms, requirements, relations, anchors, boundaryShapes, decisions, boundaries: { terms: boundaryTerms, relations: boundaryRelations, shapes: boundaryShapes } };
   diff.contexts = collectContexts(diff);
   diff.counts = {
     terms: { added: terms.added.length, modified: terms.modified.length, removed: terms.removed.length },
@@ -196,7 +209,8 @@ export function buildSemanticDiff(baseRepo, headRepo, { base = 'base', head = 'w
     relations: { added: relations.added.length, removed: relations.removed.length },
     anchors: { added: anchors.added.length, removed: anchors.removed.length },
     decisions: decisions.length,
-    boundaries: boundaryTerms.length + boundaryRelations.length,
+    boundaryShapes: { added: boundaryShapes.added.length, modified: boundaryShapes.modified.length, removed: boundaryShapes.removed.length },
+    boundaries: boundaryTerms.length + boundaryRelations.length + boundaryShapes.added.length + boundaryShapes.modified.length + boundaryShapes.removed.length,
   };
   return diff;
 }
@@ -220,9 +234,21 @@ export function formatSemanticReview(report) {
     `terms ${delta(semantic.counts.terms)} · requirements ${delta(semantic.counts.requirements)} · relations +${semantic.counts.relations.added}/-${semantic.counts.relations.removed} · anchors +${semantic.counts.anchors.added}/-${semantic.counts.anchors.removed}`,
   ];
   if (semantic.profileFields.length) lines.push(`Profile fields changed: ${semantic.profileFields.join(', ')}`);
+  lines.push('', '## Capability overview');
+  if (!impact.capabilities?.length) lines.push('- no configured capability matched the changed domain handles');
+  for (const capability of impact.capabilities || []) {
+    lines.push(`- **${capability.id} — ${capability.title}**: ${capability.terms.length} terms, ${capability.requirements.length} requirements`);
+    lines.push(`  - entrypoint: ${capability.entrypoint}`);
+    if (capability.boundaries.length) lines.push(`  - boundaries: ${capability.boundaries.join(', ')}`);
+    if (capability.decisions.length) lines.push(`  - decisions: ${capability.decisions.join(', ')}`);
+    for (const edge of capability.causalChains.slice(0, 4)) lines.push(`  - causal: ${edge.from} --${edge.relation}--> ${edge.to}`);
+    if (capability.causalChains.length > 4) lines.push(`  - causal: … ${capability.causalChains.length - 4} more edges`);
+    lines.push(`  - drill down: ${capability.drillDown}`);
+  }
   if (impact.unmappedFiles.length) {
     lines.push(`Unmapped files: ${impact.unmappedFiles.length}`);
-    for (const file of impact.unmappedFiles) lines.push(`- ${file}`);
+    for (const file of impact.unmappedFiles.slice(0, 20)) lines.push(`- ${file}`);
+    if (impact.unmappedFiles.length > 20) lines.push(`- … ${impact.unmappedFiles.length - 20} more; use --json for the complete list`);
   }
 
   lines.push('', '## Context overview');
@@ -237,6 +263,18 @@ export function formatSemanticReview(report) {
     for (const item of semantic.boundaries.terms) lines.push(`- [${item.change}] ${item.term.id} (${item.term.kind})${item.fields ? `: ${item.fields.join(', ')}` : ''}`);
     for (const item of semantic.boundaries.relations) lines.push(`- [${item.change}] ${edgeText(item.edge)}`);
   }
+  if (semantic.boundaryShapes.added.length || semantic.boundaryShapes.modified.length || semantic.boundaryShapes.removed.length) {
+    lines.push('', '## Boundary shapes');
+    for (const item of semantic.boundaryShapes.added) lines.push(`- [added] ${item.owner} → ${item.target} (${item.adapter || item.status})`);
+    for (const item of semantic.boundaryShapes.modified) {
+      const shape = item.semantic;
+      lines.push(`- [${shape.breaking ? 'breaking' : 'compatible'}] ${item.after.owner} → ${item.after.target} (${item.after.adapter || item.after.status})`);
+      if (shape.removed.length) lines.push(`  - removed: ${shape.removed.join(', ')}`);
+      if (shape.added.length) lines.push(`  - added: ${shape.added.join(', ')}`);
+      if (shape.changed.length) lines.push(`  - changed: ${shape.changed.join(', ')}`);
+    }
+    for (const item of semantic.boundaryShapes.removed) lines.push(`- [removed] ${item.owner} → ${item.target}`);
+  }
   if (semantic.decisions.length) {
     lines.push('', '## Decisions');
     for (const item of semantic.decisions) lines.push(`- [${item.severity}] ${item.code} ${item.id} — ${item.message}`);
@@ -249,8 +287,8 @@ export function formatSemanticReview(report) {
   }
   if (semantic.requirements.added.length || semantic.requirements.modified.length || semantic.requirements.removed.length) {
     lines.push('', '## Requirements');
-    for (const item of semantic.requirements.added) lines.push(`- [added] ${item.id} — ${item.title} (${item.owner})`, `  → spec.mjs context ${item.id} --slice review`);
-    for (const item of semantic.requirements.modified) lines.push(`- [modified] ${item.after.id}: ${item.fields.join(', ')}`, `  → spec.mjs context ${item.after.id} --slice review`);
+    for (const item of semantic.requirements.added) lines.push(`- [added] ${item.id} — ${item.title} (${item.owner})`, `  → spec9 context ${item.id} --slice review`);
+    for (const item of semantic.requirements.modified) lines.push(`- [modified] ${item.after.id}: ${item.fields.join(', ')}`, `  → spec9 context ${item.after.id} --slice review`);
     for (const item of semantic.requirements.removed) lines.push(`- [removed] ${item.id} — ${item.title} (${item.owner})`, `  → git show ${semantic.base.split('@')[0]}:${item.specPath}`);
   }
   if (semantic.relations.added.length || semantic.relations.removed.length) {
@@ -268,8 +306,8 @@ export function formatSemanticReview(report) {
     lines.push('', '## Detailed review route');
     for (const context of impact.contexts) {
       lines.push(`- ${context.id} — ${context.title}`);
-      for (const req of context.requirements) lines.push(`  - spec.mjs context ${req.id} --slice review`);
-      for (const decision of context.decisions) lines.push(`  - spec.mjs decision ${decision}`);
+      for (const req of context.requirements) lines.push(`  - spec9 context ${req.id} --slice review`);
+      for (const decision of context.decisions) lines.push(`  - spec9 decision ${decision}`);
     }
   }
   return lines.join('\n');

@@ -39,21 +39,21 @@ export function parseYAML(text, baseLineNo = 1) {
 export function parseFrontmatter(fileText) {
   const lines = fileText.split(/\r?\n/);
   if (lines[0] !== '---') {
-    return { frontmatter: null, body: fileText, bodyStartLine: 1, frontmatterText: '', frontmatterStartLine: 1, error: 'нет frontmatter' };
+    return { frontmatter: null, body: fileText, bodyStartLine: 1, frontmatterText: '', frontmatterStartLine: 1, error: 'frontmatter is missing' };
   }
   const end = lines.indexOf('---', 1);
   if (end === -1) {
-    return { frontmatter: null, body: fileText, bodyStartLine: 1, frontmatterText: '', frontmatterStartLine: 1, error: 'frontmatter не закрыт' };
+    return { frontmatter: null, body: fileText, bodyStartLine: 1, frontmatterText: '', frontmatterStartLine: 1, error: 'frontmatter is not closed' };
   }
   const frontmatterText = lines.slice(1, end).join('\n');
   const body = lines.slice(end + 1).join('\n');
   try {
     const frontmatter = parseYAML(frontmatterText, 2);
     if (!frontmatter || typeof frontmatter !== 'object' || Array.isArray(frontmatter)) {
-      return { frontmatter: null, body, bodyStartLine: end + 2, frontmatterText, frontmatterStartLine: 2, error: 'frontmatter должен быть объектом' };
+      return { frontmatter: null, body, bodyStartLine: end + 2, frontmatterText, frontmatterStartLine: 2, error: 'frontmatter must be a mapping' };
     }
     return { frontmatter, body, bodyStartLine: end + 2, frontmatterText, frontmatterStartLine: 2, error: null };
   } catch (error) {
-    return { frontmatter: null, body, bodyStartLine: end + 2, frontmatterText, frontmatterStartLine: 2, error: `ошибка разбора: ${error.message}` };
+    return { frontmatter: null, body, bodyStartLine: end + 2, frontmatterText, frontmatterStartLine: 2, error: `parse error: ${error.message}` };
   }
 }

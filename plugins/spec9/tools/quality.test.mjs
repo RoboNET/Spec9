@@ -28,6 +28,47 @@ test('quality отделяет семантическую слабость от 
   assert.equal(report.counts['W-BROAD-CODE-ANCHOR'], 2);
   assert.equal(report.counts['W-UNRESOLVED-CLAIM'], 1);
   assert.deepEqual(report.severityCounts, { high: 1, medium: 3, low: 2 });
-  assert.match(formatQualityReport(report), /Детализация/);
+  assert.match(formatQualityReport(report), /Details/);
   assert.match(formatQualityReport(report, { all: true }), /AUTH-001/);
+});
+
+test('quality не считает явно решённый через ADR gap анонимным долгом', () => {
+  const file = {
+    path: 'operations/check.md',
+    frontmatter: { id: 'check', context: 'auth', kind: 'операция' },
+    frontmatterStartLine: 2,
+    bodyStartLine: 20,
+    frontmatterAnchors: [],
+    requirements: [{
+      id: 'AUTH-001', headingLine: 24, sectionStart: 24, sectionEnd: 30,
+      subjects: ['auth.check', 'auth.credential'],
+      evidenceAnchors: [],
+      decidedBy: ['auth.ADR-001'],
+    }],
+    norms: [],
+    maskedLines: ['', '', '', '', 'KNOWN GAP: поведение не реализовано'],
+  };
+
+  const report = buildQualityReport({ files: [file] });
+  assert.equal(report.counts['W-UNRESOLVED-CLAIM'], 0);
+  assert.equal(report.severityCounts.high, 0);
+});
+
+test('LNT-003 quality flags an ADR that acts as the requirement specification', () => {
+  const file = {
+    path: 'decisions/ADR-001.md',
+    frontmatter: { id: 'ADR-001', context: 'auth', kind: 'decision' },
+    frontmatterStartLine: 2,
+    bodyStartLine: 20,
+    frontmatterAnchors: [],
+    requirements: [{
+      id: 'PLAN-001', qualifiedId: 'auth.PLAN-001', headingLine: 24, sectionStart: 24, sectionEnd: 30,
+      subjects: ['auth.ADR-001'], evidenceAnchors: [], decidedBy: [],
+    }],
+    norms: [],
+    maskedLines: [],
+  };
+  const report = buildQualityReport({ files: [file], decisionKind: 'decision' });
+  assert.equal(report.counts['W-DECISION-AS-SPEC'], 1);
+  assert.equal(report.rows.find((row) => row.code === 'W-DECISION-AS-SPEC').severity, 'high');
 });

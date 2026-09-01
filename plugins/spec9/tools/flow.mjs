@@ -1,4 +1,4 @@
-import { buildGraph } from './graph.mjs';
+import { buildGraph, resolveEntityKey } from './graph.mjs';
 
 /**
  * Строит причинный срез. Relation хранится на странице, которая ею владеет,
@@ -7,7 +7,8 @@ import { buildGraph } from './graph.mjs';
  */
 export function traceFlow(repo, seedId) {
   const graph = buildGraph(repo);
-  if (!graph.nodesById.has(seedId)) throw new Error(`узел "${seedId}" не найден`);
+  seedId = resolveEntityKey(repo, seedId) || seedId;
+  if (!graph.nodesById.has(seedId)) throw new Error(`node "${seedId}" not found`);
   const causal = [];
   const seen = new Set();
   for (const edge of graph.edges) {
@@ -40,8 +41,8 @@ export function traceFlow(repo, seedId) {
 
 export function formatFlow(repo, seedId) {
   const flow = traceFlow(repo, seedId);
-  if (!flow.edges.length) return `причинный срез от "${seedId}" пуст`;
-  const lines = [`Причинный срез: ${seedId}`];
+  if (!flow.edges.length) return `Causal flow from "${seedId}" is empty.`;
+  const lines = [`Causal flow: ${seedId}`];
   const depth = new Map([[seedId, 0]]);
   for (const edge of flow.edges) {
     const currentDepth = depth.get(edge.from) ?? 0;

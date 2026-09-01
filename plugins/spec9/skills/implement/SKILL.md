@@ -13,19 +13,25 @@ respective ownership roles.
 
 Resolve `product-root`, `spec-root`, and the Git base. Inspect the worktree so
 unrelated user changes remain untouched. Identify the requested semantic
-handles: qualified term IDs, requirement IDs, ADR IDs, boundary pages, or code
+handles: qualified term IDs, qualified requirement IDs, ADR IDs, boundary pages, or code
 symbols.
+
+If the profile declares `repositories`, inspect each exact Git root named by
+the change. Spec9 combines their paths under `product-root`, but the chosen
+base/head ref must resolve in every repository that supplies an affected
+boundary. Do not reduce a multi-repository product to the specification
+repository's diff.
 
 If the request begins from a requirement or term, load an implementation slice:
 
 ```bash
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> \
-  context <requirement-id-or-context.id> --slice implement
+  context <context.REQ-ID-or-context.id> --slice implement
 ```
 
 Use focused queries rather than reading the entire specification:
 
-- `trace <requirement-id>` for subject, evidence, implementation, and outcomes;
+- `trace <context.REQ-ID>` for subject, evidence, implementation, and outcomes;
 - `flow <context.id>` for causal neighbors;
 - `decision <context.ADR-id>` for current decision state and impact;
 - `why <path>#<symbol>` when code is the starting point;
@@ -47,8 +53,10 @@ Choose one of three cases from evidence:
 When a specialized boundary changes, update its owning artifact first or in the
 same change: OpenAPI/AsyncAPI/protobuf for service contracts, DDL/migrations for
 persistence, a configuration schema for configuration, and a design system or
-mockup for UI form. Spec9 describes the meaning, compatibility rule, failures,
-and anchors that artifact without copying its structure.
+mockup for UI form. Rust or TypeScript may own the published shape when there is
+no separate IDL. Spec9 describes the meaning, compatibility rule, failures,
+and anchors that artifact without copying its structure. Treat a boundary
+adapter failure as a broken contract, not as an unavailable optional check.
 
 ## Implement and connect evidence
 
@@ -70,7 +78,8 @@ closure is:
 
 ```bash
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> lint
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> trace <requirement-id>
+npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> trace <context.REQ-ID>
+npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> e2e --strict
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> doctor --strict
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> quality --all
 npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> review --base <ref> --strict
@@ -78,7 +87,7 @@ npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> chan
 ```
 
 When the affected requirement declares domain outcomes and resolves to a
-`code:` anchor, also run `outcomes <requirement-id>`. A requirement backed only
+`code:` anchor, also run `outcomes <context.REQ-ID>`. A requirement backed only
 by a schema or test has no code outcome surface to compare; record that as not
 applicable instead of treating a deliberately impossible comparison as green.
 Do not use or invent `outcomes --fix`; outcome mismatches require judgment.

@@ -9,7 +9,7 @@ import { maskZones, findLinks } from './markdown.mjs';
 import { loadRepo, buildGraph, computeObligations } from './graph.mjs';
 import { lint } from './lint.mjs';
 import { traceFlow } from './flow.mjs';
-import { contextSlice } from './slice.mjs';
+import { contextSlice, limitHumanOutput } from './slice.mjs';
 import { cmdOutcomes } from './outcomes-cmd.mjs';
 import { draftPage } from './draft.mjs';
 import { buildTrace, formatTrace } from './trace.mjs';
@@ -156,8 +156,8 @@ test('relations создают графовое ребро, Markdown-ссылк�
     'terms/c.md': entity('c'),
   });
   const graph = buildGraph(loadRepo(root));
-  assert.ok(graph.edges.some((edge) => edge.from === 'a' && edge.to === 'b' && edge.type === 'relation:references'));
-  assert.ok(!graph.edges.some((edge) => edge.from === 'a' && edge.to === 'c'));
+  assert.ok(graph.edges.some((edge) => edge.from === 'auth.a' && edge.to === 'auth.b' && edge.type === 'relation:references'));
+  assert.ok(!graph.edges.some((edge) => edge.from === 'auth.a' && edge.to === 'auth.c'));
 });
 
 test('битая relation и битая навигационная ссылка обе видны линту', () => {
@@ -228,7 +228,7 @@ test('опечатка типа якоря не теряется молча', ()
 test('субъект требования создаёт отдельное ребро графа', () => {
   const requirement = 'requirements:\n  AUTH-001:\n    kind: разрешение\n    subjects: [auth.a]\n';
   const root = repository({ ...productFiles, 'terms/a.md': entity('a'), 'terms/check.md': operation({ requirement, body: '### AUTH-001 — X\n\nОперация MAY работать.' }) });
-  assert.ok(buildGraph(loadRepo(root)).edges.some((edge) => edge.from === 'AUTH-001' && edge.to === 'a' && edge.type === 'субъект'));
+  assert.ok(buildGraph(loadRepo(root)).edges.some((edge) => edge.from === 'auth.AUTH-001' && edge.to === 'auth.a' && edge.type === 'субъект'));
 });
 
 test('исходы во frontmatter считаются закрытыми и дубли проверяются', () => {
@@ -302,7 +302,7 @@ requirements:
     'terms/check.md': operation({ requirement, body: '### AUTH-001 — X\n\n[[auth.a|A]] MAY работать.' }),
   }, profile);
   const slice = contextSlice(loadRepo(root), 'AUTH-001', 'implement');
-  assert.equal((slice.match(/Обязательства применённых паттернов термина a/g) || []).length, 1);
+  assert.equal((slice.match(/Applied pattern obligations for a/g) || []).length, 1);
   assert.match(slice, /a × one\/ONE-001/);
   assert.match(slice, /a × two\/TWO-001/);
 });
@@ -375,7 +375,7 @@ test('budget считает файлы и в режиме error не отдаё�
     'terms/b.md': entity('b'),
     'terms/check.md': operation({ requirement, body: '### AUTH-001 — X\n\n[[auth.a|A]] MAY работать. [[auth.b|B]] MAY работать.' }),
   }, profile);
-  assert.throws(() => contextSlice(loadRepo(root), 'AUTH-001', 'implement'), /бюджет исчерпан/);
+  assert.throws(() => contextSlice(loadRepo(root), 'AUTH-001', 'implement'), /budget exhausted/);
 });
 
 test('budget считает один Markdown-файл один раз, даже если из него загружены две нормы', () => {
@@ -408,6 +408,22 @@ test('budget считает один Markdown-файл один раз, даже
   assert.match(slice, /AUTH-002/);
 });
 
+test('REV-008 character budget caps the final human review payload', () => {
+  const profile = PROFILE.replace('budget: { max_files: 25, on_exhaustion: degrade_to_names }', 'budget: { max_files: 25, max_chars: 180, on_exhaustion: degrade_to_names }');
+  const requirement = 'requirements:\n  AUTH-001:\n    kind: разрешение\n    subjects: [auth.a]\n';
+  const root = repository({
+    ...productFiles,
+    'terms/a.md': entity('a', '', `Очень длинный контекст. ${'деталь '.repeat(80)}`),
+    'terms/check.md': operation({ requirement, body: '### AUTH-001 — X\n\n[[auth.a|A]] MAY работать.' }),
+  }, profile);
+  const output = contextSlice(loadRepo(root), 'AUTH-001', 'implement');
+  assert.ok(output.length <= 180);
+  assert.match(output, /output truncated/);
+  const combinedReview = limitHumanOutput(`${'seed one\n'.repeat(30)}${'seed two\n'.repeat(30)}`, { budget: { max_chars: 180 } });
+  assert.ok(combinedReview.length <= 180);
+  assert.match(combinedReview, /output truncated/);
+});
+
 test('outcomes находит frontmatter requirement и code anchor', () => {
   const page = `---\nid: check\nkind: операция\ncontext: auth\nname: check\nanchors:\n  code: [fixtures/code.ts#check]\n  test: [fixtures/test.yaml]\nrequirements:\n  AUTH-001:\n    kind: разрешение\n    subjects: [auth.check]\n    outcomes: [ok, fail]\n---\n# check\n### AUTH-001 — X\n[[auth.check|Check]] MAY вернуть исход.\n`;
   const root = repository({
@@ -416,8 +432,8 @@ test('outcomes находит frontmatter requirement и code anchor', () => {
     'fixtures/test.yaml': 'ok: true\n',
   });
   const result = cmdOutcomes(loadRepo(root), 'AUTH-001');
-  assert.match(result.text, /СОПОСТАВЛЕНИЕ ВРУЧНУЮ/);
-  assert.match(result.text, /исходы спеки:\s+ok, fail/);
+  assert.match(result.text, /MANUAL MAPPING/);
+  assert.match(result.text, /spec outcomes:\s+ok, fail/);
 });
 
 test('outcomes не считает сверку полной при unresolved даже с outcome_map', () => {
@@ -490,7 +506,7 @@ test('decided_by создаёт точную связь нормы с решен
   const repo = loadRepo(root);
   assert.deepEqual(repo.requirementsById.get('AUTH-001').req.decidedBy, ['auth.ADR-001']);
   assert.deepEqual(buildTrace(repo, { target: 'AUTH-001' })[0].decisions, ['auth.ADR-001']);
-  assert.ok(buildGraph(repo).edges.some((edge) => edge.from === 'AUTH-001' && edge.to === 'ADR-001' && edge.relation === 'decided_by'));
+  assert.ok(buildGraph(repo).edges.some((edge) => edge.from === 'auth.AUTH-001' && edge.to === 'auth.ADR-001' && edge.relation === 'decided_by'));
 });
 
 test('an accepted replacement computes the previous ADR status as replaced', () => {
@@ -525,6 +541,27 @@ test('a proposed replacement does not change the accepted ADR effective status',
   const index = decisionIndex(repo);
   assert.equal(effectiveDecisionStatus(index.get('auth.ADR-001'), index), 'принято');
   assert.deepEqual(decisionReport(repo, 'auth.ADR-001').pendingSuccessors, [{ source: 'auth.ADR-002', relation: 'replaces' }]);
+});
+
+test('explicit lifecycle roles identify proposed and accepted states independently of ordering', () => {
+  const profile = PROFILE.replace(
+    'lifecycle: [предложено, принято]',
+    'lifecycle: [заменено, принято, предложено, отклонено]\n    lifecycle_roles: { proposed: предложено, accepted: принято }',
+  );
+  const root = repository({
+    ...productFiles,
+    'terms/check.md': operation(),
+    'decisions/adr.md': decisionPage({ id: 'ADR-001' }),
+  }, profile);
+  const repo = loadRepo(root);
+  assert.equal(repo.proposedDecisionStatus, 'предложено');
+  assert.equal(repo.acceptedDecisionStatus, 'принято');
+});
+
+test('a lifecycle with terminal states must declare explicit roles', () => {
+  const profile = PROFILE.replace('lifecycle: [предложено, принято]', 'lifecycle: [предложено, принято, заменено]');
+  const root = repository({ ...productFiles, 'terms/check.md': operation(), 'decisions/adr.md': decisionPage({ id: 'ADR-001' }) }, profile);
+  assert.ok(lint(loadRepo(root)).some((finding) => finding.code === 'E-LIFECYCLE-ROLES'));
 });
 
 test('decided_by требует qualified ID решения', () => {
@@ -575,4 +612,31 @@ no_anchor: { code: external, type: external }
   const rows = buildTrace(loadRepo(root), { missingOnly: true });
   assert.equal(rows.length, 1);
   assert.ok(rows[0].gaps.some((gap) => gap.startsWith('missing-evidence:')));
+});
+
+test('ENG-005 planned norm gaps are classified separately from broken implementation', () => {
+  const profile = PROFILE.replace(
+    '  разрешение: { evidence: [] }',
+    '  разрешение: { evidence: [] }\n  проектное: { evidence: [test], state: planned }',
+  );
+  const requirement = `requirements:
+  AUTH-001:
+    kind: проектное
+    subjects: [auth.future]
+`;
+  const root = repository({
+    ...productFiles,
+    'terms/future.md': `---
+id: future
+kind: сущность
+context: auth
+name: future
+---
+# future
+`,
+    'terms/check.md': operation({ requirement, body: '### AUTH-001 — Future behavior\n\n[[auth.future|The future component]] MUST exist.' }),
+  }, profile);
+  const [row] = buildTrace(loadRepo(root), { missingOnly: true });
+  assert.equal(row.id, 'auth.AUTH-001');
+  assert.equal(row.state, 'planned');
 });

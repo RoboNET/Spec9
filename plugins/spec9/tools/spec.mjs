@@ -4,10 +4,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { loadRepo, buildGraph } from './graph.mjs';
 import { lint, formatFinding } from './lint.mjs';
-import { contextSlice, reviewSlice, why } from './slice.mjs';
+import { contextSlice, limitHumanOutput, reviewSlice, why } from './slice.mjs';
 import { cmdOutcomes } from './outcomes-cmd.mjs';
 import { cmdCandidates } from './candidates-cmd.mjs';
 import { formatFlow } from './flow.mjs';
@@ -15,13 +14,13 @@ import { draftPage } from './draft.mjs';
 import { buildTrace, formatTrace } from './trace.mjs';
 import { decisionReport, formatDecisionReport } from './decision.mjs';
 import { buildDoctorReport, formatDoctorReport } from './doctor.mjs';
-import { auditE2E, formatE2EAudit } from './e2e-audit.mjs';
+import { auditE2E, formatE2EAudit, formatE2ESuggestions } from './e2e-audit.mjs';
 import { buildReviewImpact, formatReviewImpact } from './review-impact.mjs';
 import { buildOpenSpecCoverage, formatOpenSpecCoverage } from './openspec-coverage.mjs';
 import { buildQualityReport, formatQualityReport } from './quality.mjs';
 import { buildNextQueue, formatNextQueue } from './next.mjs';
 import { buildChangeReport, formatChangeReport } from './change.mjs';
-import { loadRepoAtGitRef, changedFilesBetween } from './git-snapshot.mjs';
+import { loadRepoAtGitRef, changedFilesBetweenRepositories } from './git-snapshot.mjs';
 import { buildSemanticReview, formatSemanticReview } from './semantic-review.mjs';
 
 // CLI output must survive `| head`, `| grep`, and any consumer that closes the
@@ -91,7 +90,7 @@ function usage() {
       '  spec9 doctor [--json] [--strict]  (combined health report)',
       '  spec9 quality [--all] [--json] [--strict]  (possible false-green signals)',
       '  spec9 next [--all] [--json] [--strict]     (prioritized queue)',
-      '  spec9 e2e [--missing] [--json]    (E2E-to-Spec9 link precision)',
+      '  spec9 e2e [--missing] [--strict] [--suggest] [--json]',
       '  spec9 review (--seed-files <file>|--seed-git <ref>) [--json]',
       '  spec9 review --base <ref> [--head <ref>] [--json] [--strict]  (semantic diff)',
       '  spec9 change (--seed-files <file>|--seed-git <ref>|--base <ref> [--head <ref>]) [--json]',
@@ -102,7 +101,7 @@ function usage() {
   throw new UsageSignal();
 }
 
-function changedFilesFromArgs(args) {
+function changedFilesFromArgs(args, repo) {
   const seedFilesIdx = args.indexOf('--seed-files');
   const seedGitIdx = args.indexOf('--seed-git');
   if ((seedFilesIdx === -1) === (seedGitIdx === -1)) usage();
@@ -113,8 +112,7 @@ function changedFilesFromArgs(args) {
   }
   const ref = args[seedGitIdx + 1];
   if (!ref) usage();
-  return execFileSync('git', ['diff', '--name-only', ref], { cwd: PRODUCT_ROOT, encoding: 'utf8' })
-    .split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+  return changedFilesBetweenRepositories(PRODUCT_ROOT, repo.profile, ref);
 }
 
 function withSemanticInputs(args, callback) {
@@ -131,7 +129,7 @@ function withSemanticInputs(args, callback) {
   try {
     headSnapshot = headRef ? loadRepoAtGitRef(PRODUCT_ROOT, SPEC9_ROOT, headRef) : null;
     const headRepo = headSnapshot?.repo || loadRepo(SPEC9_ROOT, PRODUCT_ROOT);
-    const changedFiles = changedFilesBetween(PRODUCT_ROOT, baseRef, headRef);
+    const changedFiles = changedFilesBetweenRepositories(PRODUCT_ROOT, headRepo.profile, baseRef, headRef);
     return callback({
       baseRepo: baseSnapshot.repo,
       headRepo,
@@ -241,6 +239,7 @@ function main(argv) {
     if (seedFilesIdx !== -1 || seedGitIdx !== -1) {
       // Seed the review slice with changed files. There is no positional ID;
       // the seed comes from a path-list file or a Git diff against a ref.
+      const repo = loadRepo(SPEC9_ROOT, PRODUCT_ROOT);
       let seedFiles;
       if (seedFilesIdx !== -1) {
         const listPath = rest[seedFilesIdx + 1];
@@ -249,10 +248,8 @@ function main(argv) {
       } else {
         const ref = rest[seedGitIdx + 1];
         if (!ref) usage();
-        seedFiles = execFileSync('git', ['diff', '--name-only', ref], { cwd: PRODUCT_ROOT, encoding: 'utf8' })
-          .split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+        seedFiles = changedFilesBetweenRepositories(PRODUCT_ROOT, repo.profile, ref);
       }
-      const repo = loadRepo(SPEC9_ROOT, PRODUCT_ROOT);
       try {
         process.stdout.write(reviewSlice(repo, seedFiles) + '\n');
       } catch (e) {
@@ -331,22 +328,30 @@ function main(argv) {
   if (cmd === 'e2e') {
     const repo = loadRepo(SPEC9_ROOT, PRODUCT_ROOT);
     const report = auditE2E(repo);
-    process.stdout.write(rest.includes('--json') ? `${JSON.stringify(report, null, 2)}\n` : `${formatE2EAudit(report, { missingOnly: rest.includes('--missing') })}\n`);
-    process.exitCode = report.counts.missing || report.counts.invalid ? 1 : 0;
+    const output = rest.includes('--json')
+      ? JSON.stringify(report, null, 2)
+      : rest.includes('--suggest')
+        ? `${formatE2EAudit(report, { missingOnly: true })}\n\n${formatE2ESuggestions(report)}`
+        : formatE2EAudit(report, { missingOnly: rest.includes('--missing') });
+    process.stdout.write(`${output}\n`);
+    process.exitCode = report.counts.missing || report.counts.invalid || (rest.includes('--strict') && report.counts.coarse) ? 1 : 0;
     return;
   }
 
   if (cmd === 'review') {
     if (rest.includes('--base')) {
-      const report = withSemanticInputs(rest, ({ baseRepo, headRepo, changedFiles, labels }) => buildSemanticReview(baseRepo, headRepo, changedFiles, labels));
-      process.stdout.write(rest.includes('--json') ? `${JSON.stringify(report, null, 2)}\n` : `${formatSemanticReview(report)}\n`);
+      const { report, profile } = withSemanticInputs(rest, ({ baseRepo, headRepo, changedFiles, labels }) => ({
+        report: buildSemanticReview(baseRepo, headRepo, changedFiles, labels),
+        profile: headRepo.profile,
+      }));
+      process.stdout.write(rest.includes('--json') ? `${JSON.stringify(report, null, 2)}\n` : `${limitHumanOutput(formatSemanticReview(report), profile)}\n`);
       process.exitCode = report.semantic.risk === 'high' || (rest.includes('--strict') && report.semantic.risk === 'medium') ? 1 : 0;
       return;
     }
-    const changedFiles = changedFilesFromArgs(rest);
     const repo = loadRepo(SPEC9_ROOT, PRODUCT_ROOT);
+    const changedFiles = changedFilesFromArgs(rest, repo);
     const report = buildReviewImpact(repo, changedFiles);
-    process.stdout.write(rest.includes('--json') ? `${JSON.stringify(report, null, 2)}\n` : `${formatReviewImpact(report)}\n`);
+    process.stdout.write(rest.includes('--json') ? `${JSON.stringify(report, null, 2)}\n` : `${limitHumanOutput(formatReviewImpact(report), repo.profile)}\n`);
     return;
   }
 
@@ -360,8 +365,8 @@ function main(argv) {
       process.exitCode = report.risk === 'high' ? 1 : 0;
       return;
     }
-    const changedFiles = changedFilesFromArgs(rest);
     const repo = loadRepo(SPEC9_ROOT, PRODUCT_ROOT);
+    const changedFiles = changedFilesFromArgs(rest, repo);
     const report = buildChangeReport(repo, changedFiles);
     process.stdout.write(rest.includes('--json') ? `${JSON.stringify(report, null, 2)}\n` : `${formatChangeReport(report)}\n`);
     process.exitCode = report.risk === 'high' ? 1 : 0;

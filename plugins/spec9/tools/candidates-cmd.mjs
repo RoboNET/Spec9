@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { adapterForFile } from './adapters/index.mjs';
 import { parseYAML } from './yaml.mjs';
+import { resolveExistingWithinRoot } from './safe-path.mjs';
 
 // Директории, которые не сканируются: служебные (VCS/сборка), вендоренные
 // зависимости (cargo-registry, кеши сборки под debian/target-*) и сам spec9/.
@@ -37,27 +38,37 @@ const WORD_RE = /\b[A-Za-z_][A-Za-z0-9_]*\b/g;
  * @param {string} root
  * @returns {string[]} относительные пути (posix-разделитель, как в якорях)
  */
-function walkSourceFiles(root, excludedRoot = null) {
+function globRegExp(pattern) {
+  const escaped = String(pattern).replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  const source = escaped.replace(/\*\*/g, '\u0000').replace(/\*/g, '[^/]*').replace(/\u0000/g, '.*').replace(/\?/g, '[^/]');
+  return new RegExp(`^${source}$`);
+}
+
+function walkSourceFiles(root, roots = ['.'], excludedRoot = null, excludes = []) {
   const out = [];
+  const excludeMatchers = excludes.map(globRegExp);
   function walk(dir) {
-    let entries;
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       if (IGNORE_DIRS.has(entry.name)) continue;
       const full = path.join(dir, entry.name);
       if (excludedRoot && path.resolve(full) === excludedRoot) continue;
+      const rel = path.relative(root, full).split(path.sep).join('/');
+      if (excludeMatchers.some((matcher) => matcher.test(rel))) continue;
       if (entry.isDirectory()) { walk(full); continue; }
       if (!entry.isFile()) continue;
-      const rel = path.relative(root, full).split(path.sep).join('/');
       if (adapterForFile(rel)) out.push(rel);
     }
   }
-  walk(root);
-  return out.sort();
+  for (const configuredRoot of roots) {
+    const resolved = resolveExistingWithinRoot(root, configuredRoot, {
+      kind: 'directory',
+      label: 'code root',
+      allowRoot: true,
+    });
+    walk(resolved.absolute);
+  }
+  return [...new Set(out)].sort();
 }
 
 /**
@@ -172,7 +183,13 @@ export function scanCandidates(repo) {
   const cfgWeights = (repo.profile.candidates && repo.profile.candidates.weights) || {};
   const w = (key, def) => (typeof cfgWeights[key] === 'number' ? cfgWeights[key] : def);
 
-  const relFiles = walkSourceFiles(repo.productRoot, path.resolve(repo.root));
+  const configuredRoots = Array.isArray(repo.profile.code?.roots) && repo.profile.code.roots.length > 0
+    ? repo.profile.code.roots.map(String)
+    : ['.'];
+  const configuredExcludes = Array.isArray(repo.profile.code?.exclude)
+    ? repo.profile.code.exclude.map(String)
+    : [];
+  const relFiles = walkSourceFiles(repo.productRoot, configuredRoots, path.resolve(repo.root), configuredExcludes);
   /** @type {{ rel: string, source: string, adapter: * }[]} */
   const fileRecords = relFiles.map((rel) => {
     const adapter = adapterForFile(rel);
@@ -312,7 +329,7 @@ function formatSignals(c) {
   const parts = [];
   if (pro.length) parts.push(pro.join(', '));
   if (contra.length) parts.push(contra.join(', '));
-  return parts.join(' | ') || '(сигналов нет)';
+  return parts.join(' | ') || '(no signals)';
 }
 
 /**
@@ -329,21 +346,21 @@ export function cmdCandidates(repo, opts = {}) {
 
   if (opts.onlyNew) {
     if (pending.length === 0) {
-      return { text: 'новых кандидатов без вердикта нет', hasNew: false };
+      return { text: 'No new candidates without a verdict.', hasNew: false };
     }
-    const lines = pending.map((c) => `${c.file}#${c.name}  (вес ${c.weight}, ${formatSignals(c)})`);
+    const lines = pending.map((c) => `${c.file}#${c.name}  (weight ${c.weight}, ${formatSignals(c)})`);
     return {
-      text: [`НОВЫЕ КАНДИДАТЫ БЕЗ ВЕРДИКТА (${pending.length}) — вердикт в ${repo.specPathPrefix}candidates.yaml`, ...lines].join('\n'),
+      text: [`NEW CANDIDATES WITHOUT A VERDICT (${pending.length}) — record verdicts in ${repo.specPathPrefix}candidates.yaml`, ...lines].join('\n'),
       hasNew: true,
     };
   }
 
   if (pending.length === 0) {
-    return { text: 'кандидатов без вердикта нет (порог ' + threshold + ')', hasNew: false };
+    return { text: `No candidates without a verdict (threshold ${threshold}).`, hasNew: false };
   }
-  const lines = pending.map((c, i) => `${i + 1}. ${c.file}#${c.name} (${c.kind}, вес ${c.weight}) — ${formatSignals(c)}`);
+  const lines = pending.map((c, i) => `${i + 1}. ${c.file}#${c.name} (${c.kind}, weight ${c.weight}) — ${formatSignals(c)}`);
   return {
-    text: [`ОЧЕРЕДЬ КАНДИДАТОВ (${pending.length}, порог ${threshold}) — вердикт: ${repo.specPathPrefix}candidates.yaml`, ...lines].join('\n'),
+    text: [`CANDIDATE QUEUE (${pending.length}, threshold ${threshold}) — verdicts: ${repo.specPathPrefix}candidates.yaml`, ...lines].join('\n'),
     hasNew: pending.length > 0,
   };
 }

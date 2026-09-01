@@ -31,6 +31,11 @@ requirements:
     subjects: [engine.validate-specification]
     evidence:
       test: [plugins/spec9/tools/frontmatter.test.mjs#loadRepo]
+  ENG-005:
+    kind: invariant
+    subjects: [engine.validate-specification]
+    evidence:
+      test: [plugins/spec9/tools/frontmatter.test.mjs#ENG-005]
 ---
 
 # Validate a product specification
@@ -48,6 +53,14 @@ readable Markdown page under every source directory declared by the profile.
 
 [[engine.validate-specification|Specification validation]] MUST fail when the
 profile omits `sources` or declares no source directories.
+
+### ENG-005 — Health distinguishes integrity, implementation, and maturity
+
+[[engine.validate-specification|Specification validation]] MUST classify broken
+links and evidence as integrity failures, accepted requirements without
+implementation as implementation gaps, and explicitly planned requirements as
+planned work. [[engine.validate-specification|Specification validation]] MUST
+NOT promote planned work to a P0 integrity failure.
 
 The main outcome is `valid specification`. Business refusal is represented by
 `structural violations found`. A loading failure produces `specification cannot

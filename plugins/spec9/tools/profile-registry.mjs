@@ -53,6 +53,7 @@ export const MANIFEST = [
   { pattern: 'kinds.*.append_only', owner: 'loadRepo (decisionKind) + buildSemanticDiff', status: 'implemented', reason: 'semantic base/head review запрещает удаление решения и изменение уже принятого ADR; смена выбора оформляется новым replaces/revokes' },
   { pattern: 'kinds.*.applicable_to', owner: 'checkPatternApplication', status: 'implemented', reason: 'значение из profile.yaml — умолчание; frontmatter файла паттерна может переопределить (docs/history/engine-audit-2026-08-30.md P4)' },
   { pattern: 'kinds.*.lifecycle', owner: 'checkLifecycle', status: 'implemented', reason: 'status страницы обязан входить в закрытый список вида' },
+  { pattern: 'kinds.*.lifecycle_roles.*', owner: 'loadRepo + decisionIndex + buildSemanticDiff', status: 'implemented', reason: 'names semantic lifecycle roles without relying on array position' },
 
   { pattern: 'non_domain_outcomes', owner: 'cmdOutcomes', status: 'implemented', reason: '' },
 
@@ -64,6 +65,7 @@ export const MANIFEST = [
 
   { pattern: 'norm_kinds.*.evidence', owner: 'checkEvidenceMissing', status: 'implemented', reason: '' },
   { pattern: 'norm_kinds.*.any_of', owner: 'checkEvidenceMissing', status: 'implemented', reason: 'при any_of не true требуется присутствие ВСЕХ типов evidence из списка, а не любого одного (docs/history/engine-audit-2026-08-30.md P1)' },
+  { pattern: 'norm_kinds.*.state', owner: 'buildTrace', status: 'implemented', reason: 'marks requirements as planned instead of broken implementation work' },
 
   { pattern: 'slices.*.seed', owner: 'reviewSlice (spec.mjs context --seed-files/--seed-git); контекстно — cmdOutcomes/why для "символ"/"норма"', status: 'implemented', reason: 'засев по типу узла ("норма", "символ") читается контекстно самой командой (context/why); засев списком изменённых файлов (срез "review") — `spec.mjs context --slice review --seed-files <файл>` либо `--seed-git <ref>` (docs/history/engine-audit-2026-08-30.md P2, задание фазы 2 п.3)' },
   { pattern: 'slices.*.follow', owner: 'contextSlice', status: 'implemented', reason: '' },
@@ -71,8 +73,16 @@ export const MANIFEST = [
 
   { pattern: 'candidates.threshold', owner: 'cmdCandidates', status: 'implemented', reason: '' },
   { pattern: 'candidates.weights.*', owner: 'scanCandidates', status: 'implemented', reason: '' },
+  { pattern: 'code.roots', owner: 'scanCandidates', status: 'implemented', reason: 'limits candidate discovery to declared product code roots' },
+  { pattern: 'code.exclude', owner: 'scanCandidates', status: 'implemented', reason: 'excludes generated, fixture, or otherwise irrelevant source paths from candidate discovery' },
+
+  { pattern: 'e2e.roots', owner: 'auditE2E', status: 'implemented', reason: 'declares one or more case registries relative to the product root for umbrella repositories' },
+  { pattern: 'legacy.openspec_roots', owner: 'buildOpenSpecCoverage', status: 'implemented', reason: 'declares temporary migration roots, optional key prefixes, and active-change discovery' },
+  { pattern: 'repositories', owner: 'configuredGitRepositories + changedFilesBetweenRepositories + loadRepoAtGitRef', status: 'implemented', reason: 'declares Git roots combined by semantic review in an umbrella workspace' },
+  { pattern: 'review.capabilities', owner: 'checkReviewCapabilities + buildReviewImpact', status: 'implemented', reason: 'curates stable human entrypoints and groups changed handles above context and requirement detail' },
 
   { pattern: 'budget.max_files', owner: 'contextSlice (Budget)', status: 'implemented', reason: '' },
+  { pattern: 'budget.max_chars', owner: 'runNamedSlice', status: 'implemented', reason: 'bounds rendered human-review output independently of file count' },
   { pattern: 'budget.on_exhaustion', owner: 'runNamedSlice (Budget)', status: 'implemented', reason: 'два значения: "degrade_to_names" (умолчание — узлы за границей бюджета деградируют до строки-имени) и "error" (обход бросает Error со списком неотрисованных узлов вместо частичного вывода)' },
 ];
 

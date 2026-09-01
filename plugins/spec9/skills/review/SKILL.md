@@ -14,6 +14,11 @@ the worktree so unrelated user changes are not mistaken for review findings.
 If the product has no `profile.yaml`, this skill does not invent one; use the
 adoption workflow first.
 
+If `profile.yaml` declares multiple `repositories`, keep the umbrella
+`product-root`. The engine resolves the same base/head ref in each declared Git
+root and preserves product-relative path prefixes. A missing ref or repository
+is a review failure, not an empty diff.
+
 ## Start the review
 
 Choose a Git base from the user's request or known MR target. For uncommitted
@@ -54,21 +59,24 @@ node <spec9-plugin>/skills/review/scripts/prepare-review.mjs \
 Preserve the engine's top-down order:
 
 1. risk and semantic counts;
-2. affected contexts and unmapped files;
-3. boundaries;
+2. affected product capabilities and their stable entrypoints;
+3. boundaries and authoritative schema-shape compatibility;
 4. decisions and append-only ADR violations;
-5. terms and requirements;
-6. causal relations;
-7. anchors and evidence;
-8. commands for focused review.
+5. relevant causal chains;
+6. affected contexts and unmapped files;
+7. terms and requirements;
+8. anchors, evidence, and commands for focused review.
 
 Do not flood the first pass with full pages, code, or raw JSON. Keep stable
-handles (`context.id`, requirement ID, relation triple, ADR ID, anchor target)
+handles (`context.id`, `context.REQ-ID`, relation triple, ADR ID, anchor target)
 visible so a comment can be mapped back without guessing.
+Respect `budget.max_chars`; an explicit truncation marker means the reviewer
+must drill into listed handles, not that the omitted tail was semantically
+empty.
 
 When the reviewer asks to drill down, generate only the requested focused view:
 
-- requirement: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> context <REQ-ID> --slice review`;
+- requirement: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> context <context.REQ-ID> --slice review`;
 - decision: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> decision <context.ADR-id>`;
 - process: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> flow <context.id>`;
 - code rationale: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> why <path>#<symbol>`.

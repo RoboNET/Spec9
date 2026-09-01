@@ -3,7 +3,7 @@
 // и profile.yaml. При исчерпании бюджета узлы деградируют до имён, а не
 // обрезаются молча (profile.yaml → budget.on_exhaustion).
 
-import { buildGraph, resolveLink, computeObligations } from './graph.mjs';
+import { buildGraph, resolveLink, computeObligations, qualifiedEntityId, resolveEntityKey } from './graph.mjs';
 
 /**
  * Находит узел графа (сущность или норма) по id — O(1) через индекс
@@ -75,6 +75,18 @@ class Budget {
   }
 }
 
+export function limitHumanOutput(text, profile) {
+  const maxChars = Number(profile.budget?.max_chars);
+  if (!Number.isFinite(maxChars) || maxChars <= 0 || text.length <= maxChars) return text;
+  const notice = `--- output truncated (budget.max_chars=${maxChars}); open a listed context or requirement directly to continue ---`;
+  if (notice.length >= maxChars) return notice.slice(0, maxChars);
+  const contentLimit = maxChars - notice.length - 2;
+  const newline = text.lastIndexOf('\n', contentLimit);
+  const boundary = newline > 0 ? newline : contentLimit;
+  const kept = text.slice(0, boundary).trimEnd();
+  return `${kept}\n\n${notice}`.slice(0, maxChars);
+}
+
 /**
  * Проверяет допустимость перехода через границу контекста согласно cross_context
  * среза: `contract_only` пропускает только требования kind=контракт, `open` — всё.
@@ -144,11 +156,11 @@ function renderNode(node, load, repo, budget, deferred) {
 function renderObligations(entity, repo) {
   const obligations = computeObligations(entity, repo);
   if (obligations.length === 0) return '';
-  const lines = [`## Обязательства применённых паттернов термина ${entity.id}`];
+  const lines = [`## Applied pattern obligations for ${entity.id}`];
   for (const ob of obligations) {
     const evidence = ob.hasEvidence
       ? ob.evidenceAnchors.map((a) => `${a.type}:${a.target}`).join(', ')
-      : 'evidence ОТСУТСТВУЕТ';
+      : 'evidence MISSING';
     lines.push(`- ${ob.id} (kind=${ob.kindAttr ?? '?'}): ${evidence}`);
   }
   return lines.join('\n');
@@ -243,7 +255,7 @@ function runNamedSlice(repo, graph, seedId, sliceDef) {
         continue;
       }
       if (step.edge === 'применённый-паттерн') {
-        const fromEntity = repo.entities.find((en) => en.id === e.from);
+        const fromEntity = repo.entities.find((en) => qualifiedEntityId(en) === e.from);
         if (!fromEntity) continue;
         // One entity has one computed obligation bundle even when it applies
         // several patterns. The graph has one edge per pattern, so rendering
@@ -274,12 +286,12 @@ function runNamedSlice(repo, graph, seedId, sliceDef) {
       const n = findNode(graph, id);
       return n ? `${n.id} (${n.kind}, ${n.path})` : id;
     });
-    throw new Error(`бюджет исчерпан (budget.max_files=${budget.maxFiles}), on_exhaustion="error": не отрисовано ${uniqueDeferred.length} узлов: ${names.join(', ')}`);
+    throw new Error(`budget exhausted (budget.max_files=${budget.maxFiles}), on_exhaustion="error": ${uniqueDeferred.length} nodes were not rendered: ${names.join(', ')}`);
   }
 
   let text = blocks.filter(Boolean).join('\n\n');
   if (uniqueDeferred.length > 0) {
-    text += `\n\n--- за границей бюджета (budget.max_files=${budget.maxFiles}), деградировано до имён ---\n`;
+    text += `\n\n--- beyond budget (budget.max_files=${budget.maxFiles}), degraded to names ---\n`;
     text += uniqueDeferred
       .map((id) => {
         const n = findNode(graph, id);
@@ -287,6 +299,7 @@ function runNamedSlice(repo, graph, seedId, sliceDef) {
       })
       .join('\n');
   }
+  text = limitHumanOutput(text, repo.profile);
   return { text, deferred: uniqueDeferred };
 }
 
@@ -300,14 +313,17 @@ function runNamedSlice(repo, graph, seedId, sliceDef) {
 export function contextSlice(repo, seedId, sliceName) {
   const sliceDef = repo.profile.slices && repo.profile.slices[sliceName];
   if (!sliceDef) {
-    throw new Error(`неизвестный срез "${sliceName}" — доступны: ${Object.keys(repo.profile.slices || {}).join(', ')}`);
+    throw new Error(`unknown slice "${sliceName}"; available slices: ${Object.keys(repo.profile.slices || {}).join(', ')}`);
   }
   const graph = buildGraph(repo);
+  const resolvedRequirementId = repo.requirementsById.resolveKey?.(seedId) || null;
+  if (resolvedRequirementId) seedId = resolvedRequirementId;
+  else seedId = resolveEntityKey(repo, seedId) || seedId;
   if (!findNode(graph, seedId) && !findRequirement(repo, seedId)) {
-    throw new Error(`узел "${seedId}" не найден в графе`);
+    throw new Error(`node "${seedId}" was not found in the graph`);
   }
   const { text } = runNamedSlice(repo, graph, seedId, sliceDef);
-  return text || `(срез "${sliceName}" для "${seedId}" пуст)`;
+  return text || `(slice "${sliceName}" for "${seedId}" is empty)`;
 }
 
 /**
@@ -332,7 +348,7 @@ export function contextSlice(repo, seedId, sliceName) {
 export function reviewSlice(repo, seedFilePaths) {
   const sliceDef = repo.profile.slices && repo.profile.slices.review;
   if (!sliceDef) {
-    throw new Error('срез "review" не объявлен в profile.yaml — слот slices.review.seed пуст');
+    throw new Error('the "review" slice is not declared in profile.yaml; slices.review.seed is missing');
   }
   const graph = buildGraph(repo);
 
@@ -344,7 +360,7 @@ export function reviewSlice(repo, seedFilePaths) {
     // либо напрямую, либо как хвост после "spec9/".
     const specFile = repo.filesByPath.get(norm) || repo.filesByPath.get(norm.replace(/^spec9\//, ''));
     if (specFile && specFile.frontmatter && specFile.frontmatter.id) {
-      seedIds.add(specFile.frontmatter.id);
+      seedIds.add(`${specFile.frontmatter.context}.${specFile.frontmatter.id}`);
       continue;
     }
     // Файл продукта: узлы с evidence-ребром на этот путь — тот же критерий,
@@ -357,7 +373,7 @@ export function reviewSlice(repo, seedFilePaths) {
   }
 
   if (seedIds.size === 0) {
-    return `(срез "review" пуст: ни один из ${seedFilePaths.length} изменённых файлов не резолвится ни в спек-файл, ни в evidence-якорь)`;
+    return `(the "review" slice is empty: none of the ${seedFilePaths.length} changed files resolves to a specification file or evidence anchor)`;
   }
 
   // Несколько seed-узлов дают дублирующиеся куски текста (общий сосед, общее
@@ -368,11 +384,11 @@ export function reviewSlice(repo, seedFilePaths) {
     const { text } = runNamedSlice(repo, graph, seedId, sliceDef);
     if (!text || seenBlocks.has(text)) continue;
     seenBlocks.add(text);
-    sections.push(`=== засев: ${seedId} ===\n${text}`);
+    sections.push(`=== seed: ${seedId} ===\n${text}`);
   }
   return sections.length > 0
-    ? sections.join('\n\n')
-    : `(срез "review" для ${seedIds.size} засеянных узлов пуст)`;
+    ? limitHumanOutput(sections.join('\n\n'), repo.profile)
+    : `(the "review" slice is empty for ${seedIds.size} seeded nodes)`;
 }
 
 /**
@@ -398,7 +414,7 @@ export function why(repo, target) {
     return true;
   });
 
-  if (matchingEdges.length === 0) return `(ничего не ссылается на "${target}" через code:-якорь)`;
+  if (matchingEdges.length === 0) return `(nothing references "${target}" through a code anchor)`;
 
   const lines = [];
   for (const e of matchingEdges) {
@@ -410,14 +426,14 @@ export function why(repo, target) {
     const reqInfo = findRequirement(repo, e.from);
     const owningFile = reqInfo ? reqInfo.file : repo.files.find((f) => f.path === fromNode?.path);
     if (owningFile && owningFile.frontmatter) {
-      lines.push(`  термин: ${owningFile.frontmatter.id} (${owningFile.frontmatter.kind}, ${owningFile.path})`);
+      lines.push(`  term: ${owningFile.frontmatter.id} (${owningFile.frontmatter.kind}, ${owningFile.path})`);
     }
 
     // Связанные решения: рёбра "решение" от той же нормы/термина.
     const decisionEdges = graph.edges.filter((d) => d.from === e.from && d.type === 'решение');
     for (const d of decisionEdges) {
       const decisionNode = findNode(graph, d.to);
-      lines.push(`  решение: ${decisionNode ? `${decisionNode.id} — ${decisionNode.name}` : d.to}`);
+      lines.push(`  decision: ${decisionNode ? `${decisionNode.id} — ${decisionNode.name}` : d.to}`);
     }
   }
   return lines.join('\n');

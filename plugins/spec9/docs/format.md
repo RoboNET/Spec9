@@ -63,6 +63,16 @@ anchors:
 Supported anchor types are `code`, `type`, `test`, `schema`, `exemplar`, and
 `counterexample`. Each profile kind declares required and optional types.
 `#symbol` is optional, but preferred for code and type anchors.
+For OpenAPI, AsyncAPI, and JSON Schema it may be a named component or JSON
+Pointer, for example `schema:api.yaml#User` or
+`schema:api.yaml#/components/schemas/User`. SQL schema anchors may name a table.
+Rust, TypeScript/TSX, and protobuf schema anchors may name a public type or
+callable; a whole-file Rust boundary also includes `extern` ABI declarations.
+Markdown design/interface anchors compare their heading structure and may name
+a heading. Unsupported schema formats fail closed rather than degrading to a
+file-exists check.
+The specialized artifact remains authoritative; Spec9 reads its public shape
+for semantic review and does not copy that structure into Markdown.
 
 If a required anchor is impossible by design, declare the reason:
 
@@ -103,9 +113,42 @@ The heading and prose are not duplicate metadata stores. The ID connects prose
 to frontmatter; kind, subjects, evidence, and outcomes come only from YAML.
 Every subject appears as a typed wiki link near the normative operator.
 
+The frontmatter key remains local for readable headings, but every external
+handle is qualified as `context.REQ-ID`, including E2E references such as
+`requirement: spec9:runtime.IPC-001`. An unqualified ID is a migration alias
+only while it is unique across all contexts.
+
 `decided_by` is optional and contains qualified ADR IDs only when an explicit
 choice created the requirement. `origins` is migration provenance in the form
 `<capability>::<exact OpenSpec Requirement heading>`.
+
+Requirements belong to the domain pages they constrain. An ADR records the
+choice and links to those requirements through `decided_by`; it is not a
+container for a parallel feature specification.
+
+## Product roots and planned norms
+
+An umbrella profile can limit code-derived candidate discovery:
+
+```yaml
+code:
+  roots: [core, enterprise]
+  exclude: ["**/fixtures/**", "**/generated/**"]
+
+norm_kinds:
+  planned: { evidence: [], state: planned }
+
+repositories:
+  - { id: specification, path: . }
+  - { id: core, path: core }
+  - { id: enterprise, path: enterprise }
+```
+
+`state: planned` keeps intentional future work separate from broken links and
+accepted implementation gaps. It does not waive structural lint.
+Every configured root must exist and resolve inside `product-root`. The
+`repositories` list names exact Git roots; semantic snapshots and changed-file
+seeds retain each entry's product-relative prefix.
 
 ## Decisions
 
@@ -127,6 +170,47 @@ relations:
 
 After acceptance, `status` becomes `accepted`; the previous decision's
 effective status is derived from incoming accepted relations.
+
+Profiles with more than two lifecycle states declare semantic roles explicitly:
+
+```yaml
+kinds:
+  decision:
+    lifecycle: [draft, proposed, accepted, rejected, superseded]
+    lifecycle_roles: { proposed: proposed, accepted: accepted }
+```
+
+## Review budgets
+
+```yaml
+budget:
+  max_files: 25
+  max_chars: 20000
+  on_exhaustion: degrade_to_names
+```
+
+`max_files` controls full graph loads. `max_chars` caps the final human-facing
+slice, including a combined multi-seed review, and makes truncation explicit.
+
+## Human review capabilities
+
+A product may curate a small set of stable review entrypoints without adding a
+new domain kind or duplicating requirements:
+
+```yaml
+review:
+  capabilities:
+    - id: certificate-login
+      title: Certificate login
+      entrypoint: auth.login-dialog
+      members: [auth.login, runtime.open-session]
+```
+
+`entrypoint` and every `members` value are qualified term IDs. Review expands
+their causal flows, groups changed terms and requirements beneath the matching
+capability, and shows boundaries, ADRs, and causal edges before context-level
+detail. The list is navigation metadata; domain meaning remains on the linked
+pages.
 
 ## Process outcomes
 

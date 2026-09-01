@@ -51,6 +51,49 @@ norm_kinds: {}
   }
 });
 
+test('GRF-003 qualified requirement IDs are canonical and ambiguous local IDs do not resolve', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'spec9-requirement-identity-'));
+  try {
+    fs.mkdirSync(path.join(directory, 'terms'));
+    fs.writeFileSync(path.join(directory, 'profile.yaml'), `
+profile: requirement-identity
+sources: [terms]
+relation_types: { references: { cardinality: many } }
+contexts:
+  one: { title: One, prefix: [REQ] }
+  two: { title: Two, prefix: [REQ] }
+kinds:
+  component: { title: Component, anchors: { required: [] } }
+norm_kinds:
+  invariant: { evidence: [] }
+`);
+    for (const context of ['one', 'two']) {
+      fs.writeFileSync(path.join(directory, 'terms', `${context}.md`), `---
+id: subject
+kind: component
+context: ${context}
+name: ${context}
+requirements:
+  REQ-001:
+    kind: invariant
+    subjects: [${context}.subject]
+---
+# ${context}
+
+### REQ-001 — Identity
+
+[[${context}.subject|The subject]] MUST retain its context.
+`);
+    }
+    const repository = loadRepo(directory, directory);
+    assert.deepEqual([...repository.requirementsById.keys()], ['one.REQ-001', 'two.REQ-001']);
+    assert.equal(repository.requirementsById.get('one.REQ-001')?.req.id, 'REQ-001');
+    assert.equal(repository.requirementsById.get('REQ-001'), undefined);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('GRF-002 rejects unsafe or imprecise anchors', () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'spec9-anchor-'));
   try {
@@ -60,5 +103,19 @@ test('GRF-002 rejects unsafe or imprecise anchors', () => {
     assert.equal(resolveAnchor({ file: 'source.mjs', symbol: 'targetSymbol' }, directory).ok, true);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('GRF-002 rejects a specification source symlink that escapes its root', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'spec9-source-root-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'spec9-source-outside-'));
+  try {
+    fs.writeFileSync(path.join(directory, 'profile.yaml'), 'sources: [terms]\n');
+    fs.writeFileSync(path.join(outside, 'page.md'), '# Outside\n');
+    fs.symlinkSync(outside, path.join(directory, 'terms'));
+    assert.throws(() => loadRepo(directory, directory), /resolves outside the configured root/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
   }
 });

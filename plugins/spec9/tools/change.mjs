@@ -36,8 +36,8 @@ export function buildChangeReport(repo, changedFiles, { semanticDiff = null } = 
   if (requirementIds.size) checks.add('spec9 trace --missing');
   if (changedSpec) checks.add('spec9 coverage --missing');
 
-  const hasHardRisk = lintFindings.some((row) => row.level === 'ERROR') || traceGaps.length || outcomes.some((row) => row.status === 'discrepancy') || semanticDiff?.risk === 'high';
-  const hasReviewRisk = impact.unmappedFiles.length || lintFindings.length || quality.length || outcomes.some((row) => row.status === 'unchecked') || e2eRows.some((row) => row.coverage !== 'exact') || semanticDiff?.risk === 'medium';
+  const hasHardRisk = lintFindings.some((row) => row.level === 'ERROR') || traceGaps.some((row) => row.state === 'broken') || outcomes.some((row) => row.status === 'discrepancy') || semanticDiff?.risk === 'high';
+  const hasReviewRisk = impact.unmappedFiles.length || lintFindings.length || quality.length || traceGaps.length || outcomes.some((row) => row.status === 'unchecked') || e2eRows.some((row) => row.coverage !== 'exact') || semanticDiff?.risk === 'medium';
   const risk = hasHardRisk ? 'high' : hasReviewRisk ? 'medium' : 'low';
 
   return {

@@ -13,7 +13,7 @@ import { scanCandidates, cmdCandidates, loadVerdicts } from './candidates-cmd.mj
  *   candidatesYaml?: string|null, weights?: Record<string,number>, threshold?: number }} opts
  * @returns {import('./graph.mjs').Repo}
  */
-function makeFixtureRepo({ productFiles, specFiles = {}, candidatesYaml = null, weights = {}, threshold = 1 }) {
+function makeFixtureRepo({ productFiles, specFiles = {}, candidatesYaml = null, weights = {}, threshold = 1, code = null }) {
   const productRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'spec9-candidates-product-'));
   const spec9Root = fs.mkdtempSync(path.join(os.tmpdir(), 'spec9-candidates-spec9-'));
   for (const [rel, content] of Object.entries(productFiles)) {
@@ -24,7 +24,7 @@ function makeFixtureRepo({ productFiles, specFiles = {}, candidatesYaml = null, 
   const weightsYaml = Object.entries(weights).map(([k, v]) => `    ${k}: ${v}`).join('\n');
   fs.writeFileSync(
     path.join(spec9Root, 'profile.yaml'),
-    `sources: [terms, processes, patterns, decisions, events, contracts, interfaces, persistence]\ncandidates:\n  threshold: ${threshold}\n  weights:\n${weightsYaml || '    {}'}\n`,
+    `sources: [terms, processes, patterns, decisions, events, contracts, interfaces, persistence]\n${code ? `code:\n  roots: ${JSON.stringify(code.roots)}\n  exclude: ${JSON.stringify(code.exclude || [])}\n` : ''}candidates:\n  threshold: ${threshold}\n  weights:\n${weightsYaml || '    {}'}\n`,
     'utf8',
   );
   for (const [rel, content] of Object.entries(specFiles)) {
@@ -35,6 +35,29 @@ function makeFixtureRepo({ productFiles, specFiles = {}, candidatesYaml = null, 
   if (candidatesYaml !== null) fs.writeFileSync(path.join(spec9Root, 'candidates.yaml'), candidatesYaml, 'utf8');
   return loadRepo(spec9Root, productRoot);
 }
+
+test('FMT-006 candidates scan only configured code roots and honor exclusions', () => {
+  const repo = makeFixtureRepo({
+    productFiles: {
+      'core/src/lib.rs': 'pub struct IncludedDomainType { pub value: u32 }\n',
+      'enterprise/src/lib.rs': 'pub struct OutsideConfiguredRoot { pub value: u32 }\n',
+      'core/generated/model.rs': 'pub struct GeneratedType { pub value: u32 }\n',
+    },
+    code: { roots: ['core'], exclude: ['**/generated/**'] },
+  });
+  const names = scanCandidates(repo).map((candidate) => candidate.name);
+  assert.ok(names.includes('IncludedDomainType'));
+  assert.ok(!names.includes('OutsideConfiguredRoot'));
+  assert.ok(!names.includes('GeneratedType'));
+});
+
+test('FMT-006 candidates fail closed when a configured code root is missing', () => {
+  const repo = makeFixtureRepo({
+    productFiles: { 'core/src/lib.rs': 'pub struct Present;\n' },
+    code: { roots: ['missing'] },
+  });
+  assert.throws(() => scanCandidates(repo), /code root does not exist/);
+});
 
 function find(candidates, name) {
   return candidates.find((c) => c.name === name);

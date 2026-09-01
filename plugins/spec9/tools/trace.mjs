@@ -33,7 +33,10 @@ function hasDeclaredNoImplementationAnchor(entity) {
 
 function targetPredicate(repo, target) {
   if (!target) return () => true;
-  if (repo.requirementsById.has(target)) return ({ id }) => id === target;
+  const requirementCandidates = repo.requirementsById.candidates?.(target)
+    || (repo.requirementsById.has(target) ? [target] : []);
+  if (requirementCandidates.length > 1) throw new Error(`requirement "${target}" is ambiguous; use context.ID`);
+  if (requirementCandidates.length === 1) return ({ id }) => id === requirementCandidates[0];
 
   let entity = null;
   const dot = target.indexOf('.');
@@ -72,11 +75,11 @@ export function buildTrace(repo, { target = null, missingOnly = false } = {}) {
           return { id: ref, kind: null, path: null, anchors: [], resolved: false };
         }
         const entity = resolution.target;
-        const anchors = implementationAnchors(entity).map((anchor) => ({
-          type: anchor.type,
-          target: anchor.target,
-          ok: resolveAnchor(anchor, repo.productRoot).ok,
-        }));
+        const anchors = implementationAnchors(entity).map((anchor) => {
+          const resolution = resolveAnchor(anchor, repo.productRoot);
+          if (!resolution.ok) gaps.push(`broken-implementation-anchor:${qualified(entity)}:${anchor.target}`);
+          return { type: anchor.type, target: anchor.target, ok: resolution.ok };
+        });
         if (anchors.length === 0 && !hasDeclaredNoImplementationAnchor(entity)) {
           gaps.push(`no-implementation-anchor:${qualified(entity)}`);
         }
@@ -91,8 +94,20 @@ export function buildTrace(repo, { target = null, missingOnly = false } = {}) {
       const missingEvidence = evidenceGap(req, repo.profile);
       if (missingEvidence) gaps.push(missingEvidence);
 
+      const normState = repo.profile.norm_kinds?.[req.kindAttr]?.state || null;
+      const proposedDecision = (req.decidedBy || []).some((id) => {
+        const resolution = resolveLink({ ref: id }, String(fm.context), repo);
+        return resolution.target?.kind === repo.decisionKind
+          && resolution.target.file.frontmatter?.status === repo.proposedDecisionStatus;
+      });
+      const planned = normState === 'planned' || proposedDecision;
+      const brokenPrefixes = ['no-subject', 'unresolved-subject:', 'broken-evidence:', 'broken-implementation-anchor:'];
+      const hasBrokenGap = gaps.some((gap) => brokenPrefixes.some((prefix) => gap === prefix || gap.startsWith(prefix)));
+      const state = hasBrokenGap ? 'broken' : gaps.length === 0 ? 'healthy' : planned ? 'planned' : 'implementation';
+
       rows.push({
-        id: req.id,
+        id: req.qualifiedId || `${fm.context}.${req.id}`,
+        localId: req.id,
         title: req.title,
         kind: req.kindAttr,
         owner: { id: qualified(ownerEntity), kind: ownerEntity.kind, path: file.path },
@@ -101,6 +116,7 @@ export function buildTrace(repo, { target = null, missingOnly = false } = {}) {
         evidence,
         outcomes: req.outcomes?.values || [],
         gaps: [...new Set(gaps)],
+        state,
       });
     }
   }
@@ -120,8 +136,8 @@ function cell(value) {
 export function formatTrace(rows, { missingOnly = false } = {}) {
   if (rows.length === 0) return missingOnly ? 'No trace gaps found.' : 'No requirements found.';
   const lines = [
-    '| Requirement | Kind | Owner | Decisions | Subjects | Evidence | Subject implementation | Outcomes | Gaps |',
-    '|---|---|---|---|---|---|---|---|---|',
+    '| Requirement | State | Kind | Owner | Decisions | Subjects | Evidence | Subject implementation | Outcomes | Gaps |',
+    '|---|---|---|---|---|---|---|---|---|---|',
   ];
   for (const row of rows) {
     const subjects = row.subjects.map((subject) => `${subject.id}${subject.kind ? ` (${subject.kind})` : ' (unresolved)'}`);
@@ -129,7 +145,7 @@ export function formatTrace(rows, { missingOnly = false } = {}) {
     const implementation = row.subjects.flatMap((subject) => subject.anchors.map(
       (anchor) => `${anchor.ok ? '✓' : '✗'} ${subject.id} → ${anchor.type}:${anchor.target}`,
     ));
-    lines.push(`| ${cell(`${row.id} — ${row.title}`)} | ${cell(row.kind)} | ${cell(row.owner.id)} | ${cell(row.decisions)} | ${cell(subjects)} | ${cell(evidence)} | ${cell(implementation)} | ${cell(row.outcomes)} | ${cell(row.gaps)} |`);
+    lines.push(`| ${cell(`${row.id} — ${row.title}`)} | ${cell(row.state)} | ${cell(row.kind)} | ${cell(row.owner.id)} | ${cell(row.decisions)} | ${cell(subjects)} | ${cell(evidence)} | ${cell(implementation)} | ${cell(row.outcomes)} | ${cell(row.gaps)} |`);
   }
   return lines.join('\n');
 }

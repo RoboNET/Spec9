@@ -1,5 +1,8 @@
 # Spec9
 
+[![npm](https://img.shields.io/npm/v/spec9)](https://www.npmjs.com/package/spec9)
+[![license](https://img.shields.io/npm/l/spec9)](LICENSE)
+
 Spec9 is a domain-addressable specification engine. It stores meaning in
 Markdown with YAML frontmatter, builds a graph of terms, requirements,
 processes, boundaries, and decisions, and connects them to code, tests,
@@ -20,12 +23,13 @@ documentation are never copied into vendor-specific variants.
 
 ## CLI
 
-After the package is published, run Spec9 without a global installation:
+The CLI is published as [`spec9` on npm](https://www.npmjs.com/package/spec9).
+Run the current stable release without a global installation:
 
 ```bash
-npx --yes spec9@0.1.0 --spec-root /path/to/product/spec9 \
+npx --yes spec9@latest --spec-root /path/to/product/spec9 \
   --product-root /path/to/product lint
-npx --yes spec9@0.1.0 --spec-root /path/to/product/spec9 \
+npx --yes spec9@latest --spec-root /path/to/product/spec9 \
   --product-root /path/to/product review --base HEAD
 ```
 
@@ -35,8 +39,15 @@ discovered automatically. When run from the specification directory containing
 
 The primary commands are `lint`, `graph`, `flow`, `context`, `trace`,
 `decision`, `doctor`, `quality`, `next`, `review`, `change`, `coverage`, `e2e`,
-`outcomes`, and `candidates`. Run `npx --yes spec9@0.1.0 --help` for the full
+`outcomes`, and `candidates`. Run `npx --yes spec9@latest --help` for the full
 command list.
+
+Requirement handles are context-qualified (`auth.REVS-001`), just like terms.
+Unqualified requirement IDs are accepted only as a compatibility alias when
+they resolve uniquely. `doctor` separates integrity failures, implementation
+gaps, planned work, and maturity signals. `e2e --strict` requires exact
+case-level evidence; `e2e --suggest` prints reviewed frontmatter additions
+without writing them.
 
 During development of this repository, `npm exec -- spec9 ...` uses the local
 worktree instead of downloading the published package.
@@ -85,10 +96,17 @@ source of behavior.
 - Spec9 owns the format contract, checks, graph traversal, and review views.
 - A product profile declares legal kinds, relations, anchors, and slices.
 - Code owns internal structure and signatures.
-- OpenAPI, AsyncAPI, protobuf, DDL/migrations, JSON Schema, and design tools own
-  the shape of published boundaries; Spec9 connects those shapes to domain
-  meaning.
+- OpenAPI, AsyncAPI, protobuf, DDL/migrations, JSON Schema, configuration, and
+  design tools own the shape of published boundaries; Rust and TypeScript can
+  also be authoritative source-shaped boundaries. Spec9 connects those shapes
+  to domain meaning and reviews supported shape deltas through fail-closed
+  adapters.
 - Git owns history. Spec9 does not create a parallel delta tree.
+
+An umbrella product may declare several exact Git roots in `profile.yaml`.
+`review`, `change`, and `--seed-git` then combine their changed files while
+preserving product-relative paths, and Git snapshots load anchored boundary
+sources from the corresponding repository at the selected ref.
 
 ## Development
 
@@ -109,12 +127,11 @@ Publishing. To release a version:
 1. Update `version` in `package.json` and `package-lock.json`. The plugin
    manifests are checked against that version by `npm run validate`.
 2. Merge the version change to `main` and create a GitHub Release whose tag is
-   exactly `v<version>`, for example `v0.1.0`.
+   exactly `v<version>`, for example `v0.1.1`.
 3. Publishing the GitHub Release validates, packs, and publishes the package.
    Stable versions use the npm `latest` tag; SemVer prereleases use `next`.
 
-The npm package must configure this trusted publisher before the workflow can
-authenticate:
+The npm package trusts this publisher configuration:
 
 - provider: GitHub Actions;
 - organization: `RoboNET`;
@@ -122,8 +139,6 @@ authenticate:
 - workflow filename: `publish-npm.yml`;
 - allowed action: `npm publish`.
 
-Trusted Publishing requires the package to exist on npm first. Bootstrap the
-initial package version once with a short-lived granular npm token, configure
-the trusted publisher above, revoke the bootstrap token, and use GitHub Releases
-for every later publication. Do not add an `NPM_TOKEN` repository secret for the
-steady-state workflow.
+Version `0.1.0` bootstrapped the package. Later releases use short-lived GitHub
+OIDC credentials and npm provenance; the repository does not need an
+`NPM_TOKEN` secret.

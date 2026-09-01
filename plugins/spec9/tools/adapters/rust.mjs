@@ -178,7 +178,7 @@ function findEscapingSites(body) {
   const sliceRe = /\b([A-Za-z_][A-Za-z0-9_]*)\[[^\]\n]*\]/g;
   let sm;
   while ((sm = sliceRe.exec(body))) {
-    found.push(`индексация ${sm[0]}`);
+    found.push(`indexing ${sm[0]}`);
   }
   return found;
 }
@@ -254,8 +254,8 @@ function extractFunctionOutcomes(source, symbol, options = {}) {
     if (!errorVariants && !hasStruct) {
       unresolved.push(
         errorName
-          ? `тип ошибки "${errorName}" не найден как enum в файле`
-          : 'тип ошибки Result не разобран',
+          ? `error type "${errorName}" was not found as an enum in the file`
+          : 'Result error type could not be resolved',
       );
     }
   } else if (retTypeName) {
@@ -264,10 +264,10 @@ function extractFunctionOutcomes(source, symbol, options = {}) {
       declared = variants;
       confidence = 'syntactic';
     } else {
-      unresolved.push(`тип возврата "${retTypeName}" не найден как enum в файле`);
+      unresolved.push(`return type "${retTypeName}" was not found as an enum in the file`);
     }
   } else {
-    unresolved.push('тип возврата не указан или не разобран');
+    unresolved.push('return type is missing or could not be resolved');
   }
 
   return { declared, escaping: findEscapingSites(body), confidence, unresolved };

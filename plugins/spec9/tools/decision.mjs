@@ -88,7 +88,7 @@ function requirementsDecidedBy(repo, decisionId) {
         const target = resolveLink({ ref }, context, repo).target;
         return target && keyOf(target) === decisionId;
       });
-      if (matches) rows.push({ id: req.id, title: req.title, owner: `${context}.${file.frontmatter.id}`, path: file.path });
+      if (matches) rows.push({ id: req.qualifiedId || `${context}.${req.id}`, title: req.title, owner: `${context}.${file.frontmatter.id}`, path: file.path });
     }
   }
   return rows;

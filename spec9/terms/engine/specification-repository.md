@@ -23,7 +23,14 @@ requirements:
     kind: invariant
     subjects: [engine.specification-repository]
     evidence:
-      test: [scripts/engine-contract.test.mjs#GRF-002]
+      test:
+        - scripts/engine-contract.test.mjs#GRF-002
+        - plugins/spec9/tools/boundary-adapters.test.mjs#REV-007
+  GRF-003:
+    kind: invariant
+    subjects: [engine.specification-repository]
+    evidence:
+      test: [scripts/engine-contract.test.mjs#GRF-003]
 ---
 
 # In-memory specification repository
@@ -42,4 +49,14 @@ contexts.
 
 [[engine.specification-repository|The specification repository]] MUST reject an
 anchor that escapes the product root, resolves to a directory, or names a
-missing whole-token symbol.
+missing whole-token symbol. [[engine.specification-repository|The specification
+repository]] MUST keep both the lexical path and its resolved real path inside
+the root, so an in-repository symlink cannot escape it.
+
+### GRF-003 — Requirement identity is context-qualified
+
+[[engine.specification-repository|The specification repository]] MUST expose a
+requirement as `context.ID`. [[engine.specification-repository|The specification
+repository]] MAY accept an unqualified ID only when exactly one context declares
+it. [[engine.specification-repository|The specification repository]] MUST NOT
+resolve an ambiguous local ID.

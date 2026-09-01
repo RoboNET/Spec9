@@ -171,13 +171,13 @@ function findEscapingSites(body) {
       continue;
     }
     if (BARE_IDENT_RE.test(expr)) { escaping.push({ label: `throw ${expr}`, exceptionType: null }); continue; }
-    unresolved.push(`throw с неразобранным выражением: ${expr.slice(0, 60)}`);
+    unresolved.push(`throw expression could not be resolved: ${expr.slice(0, 60)}`);
   }
   THROW_IF_NULL_RE.lastIndex = 0;
   while ((m = THROW_IF_NULL_RE.exec(body))) escaping.push({ label: 'ArgumentNullException.ThrowIfNull(', exceptionType: null });
   THROW_IF_RE.lastIndex = 0;
   while ((m = THROW_IF_RE.exec(body))) escaping.push({ label: 'ObjectDisposedException.ThrowIf(', exceptionType: null });
-  if (REFLECTION_RE.test(body)) unresolved.push('Activator.CreateInstance(...) — динамическое создание, не разобрано');
+  if (REFLECTION_RE.test(body)) unresolved.push('Activator.CreateInstance(...) uses dynamic construction and could not be resolved');
   return { escaping, unresolved };
 }
 
@@ -241,7 +241,7 @@ export function extractOutcomes(source, symbol) {
     declared: xmlDocExceptions,
     escaping,
     confidence: 'shallow',
-    unresolved: [...escapingUnresolved, `тип возврата "${text}" не enum/иерархия/OneOf|Result — не разобран`],
+    unresolved: [...escapingUnresolved, `return type "${text}" is not an enum, hierarchy, OneOf, or Result and could not be resolved`],
   };
 }
 

@@ -45,6 +45,7 @@ kinds:
     title: Architectural choice with a rejected alternative
     append_only: true
     lifecycle: [proposed, accepted]
+    lifecycle_roles: { proposed: proposed, accepted: accepted }
     required_fields: [status, date, relations.affects]
     required_sections: [Context, Decision, Rejected alternatives, Reconsider when]
 
@@ -89,4 +90,5 @@ slices:
 
 budget:
   max_files: 25
+  max_chars: 30000
   on_exhaustion: degrade_to_names

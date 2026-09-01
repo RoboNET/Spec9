@@ -85,17 +85,17 @@ function resolveUnionMember(source, part, visited) {
   if (part.startsWith('{')) {
     const kindMatch = KIND_FIELD_RE.exec(part);
     if (kindMatch) return { values: [kindMatch[2]], unresolved: [] };
-    return { values: [], unresolved: [`форма union-варианта без поля kind/type: ${part.slice(0, 40)}`] };
+    return { values: [], unresolved: [`union variant has no kind/type field: ${part.slice(0, 40)}`] };
   }
 
   const identMatch = /^([A-Za-z_$][A-Za-z0-9_$.]*)$/.exec(part);
   if (identMatch) {
     const resolved = resolveTypeByName(source, identMatch[1], visited);
     if (resolved) return resolved;
-    return { values: [], unresolved: [`union-член "${part}" не разобран (внешний или неизвестный тип)`] };
+    return { values: [], unresolved: [`union member "${part}" could not be resolved (external or unknown type)`] };
   }
 
-  return { values: [], unresolved: [`union-член не разобран: ${part.slice(0, 40)}`] };
+  return { values: [], unresolved: [`union member could not be resolved: ${part.slice(0, 40)}`] };
 }
 
 /**
@@ -267,11 +267,11 @@ function findEscapingSites(body) {
     const newCall = NEW_CALL_RE.exec(expr);
     if (newCall) { escaping.push(`throw new ${newCall[1]}`); continue; }
     if (BARE_IDENT_RE.test(expr)) { escaping.push(`throw ${expr}`); continue; }
-    unresolved.push(`throw с неразобранным выражением: ${expr.slice(0, 60)}`);
+    unresolved.push(`throw expression could not be resolved: ${expr.slice(0, 60)}`);
   }
   REJECT_RE.lastIndex = 0;
   while ((m = REJECT_RE.exec(body))) escaping.push('Promise.reject(');
-  if (EVAL_RE.test(body)) unresolved.push('eval(...) — динамический код, не разобрано');
+  if (EVAL_RE.test(body)) unresolved.push('eval(...) uses dynamic code and could not be resolved');
   return { escaping, unresolved };
 }
 
@@ -304,7 +304,7 @@ export function extractOutcomes(source, symbol) {
       declared: [],
       escaping,
       confidence: 'shallow',
-      unresolved: [...escapingUnresolved, 'тип возврата не аннотирован'],
+      unresolved: [...escapingUnresolved, 'return type is not annotated'],
     };
   }
 

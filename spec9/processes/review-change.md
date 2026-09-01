@@ -30,6 +30,18 @@ requirements:
     subjects: [engine.review-change]
     evidence:
       test: [plugins/spec9/tools/semantic-review.test.mjs#buildChangeReport]
+  REV-008:
+    kind: operational
+    subjects: [engine.review-change]
+    evidence:
+      code: [plugins/spec9/tools/slice.mjs#reviewSlice]
+      test: [plugins/spec9/tools/frontmatter.test.mjs#REV-008]
+  REV-009:
+    kind: operational
+    subjects: [engine.review-change]
+    evidence:
+      code: [plugins/spec9/tools/review-impact.mjs#buildReviewImpact]
+      test: [plugins/spec9/tools/semantic-review.test.mjs#REV-009]
 ---
 
 # Review a semantic specification change
@@ -48,6 +60,20 @@ change review]] MUST classify changes to domain nodes and requirements.
 
 [[engine.review-change|Semantic change review]] MUST report changed product
 files that no specification anchor maps to a domain node.
+
+### REV-008 — Human review output has an explicit size budget
+
+[[engine.review-change|Semantic change review]] MUST apply the configured
+character budget to the final combined review payload and expose truncation
+instead of silently omitting detail.
+
+### REV-009 — Review begins with product capabilities
+
+[[engine.review-change|Semantic change review]] MUST group affected domain
+handles under curated product capabilities before contexts and individual
+requirements. [[engine.review-change|Semantic change review]] MUST keep stable
+entrypoints, boundary handles, decision IDs, causal edges, and drill-down
+commands visible on the first pass.
 
 The main outcomes are `no domain change` and `reviewable semantic change`.
 `forbidden accepted-decision mutation` is the business refusal. `base or head
