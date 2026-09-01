@@ -26,7 +26,7 @@
  * Манифест владения ключами profile.yaml. `pattern` — путь через точку,
  * где `*` соответствует ЛЮБОМУ единственному сегменту (имени вида, контекста,
  * среза, типа нормы) на этой позиции. Порядок пунктов — порядок, в котором
- * их стоит чинить (см. REVIEW.md C2 и подраздел "профиль обещает — код не
+ * их стоит чинить (см. docs/history/engine-audit-2026-08-30.md C2 и подраздел "профиль обещает — код не
  * читает"), не порядок исполнения.
  * @type {RegistryEntry[]}
  */
@@ -51,21 +51,21 @@ export const MANIFEST = [
   { pattern: 'kinds.*.must', owner: 'checkKindMust', status: 'implemented', reason: 'значения "outcomes", "rejected_alternative", "producer" — см. checkKindMust' },
   { pattern: 'kinds.*.computes_obligations', owner: 'loadRepo (buildGraph.patternKind)', status: 'implemented', reason: 'помечает вид, требования которого вычисляются для каждого применения' },
   { pattern: 'kinds.*.append_only', owner: 'loadRepo (decisionKind) + buildSemanticDiff', status: 'implemented', reason: 'semantic base/head review запрещает удаление решения и изменение уже принятого ADR; смена выбора оформляется новым replaces/revokes' },
-  { pattern: 'kinds.*.applicable_to', owner: 'checkPatternApplication', status: 'implemented', reason: 'значение из profile.yaml — умолчание; frontmatter файла паттерна может переопределить (REVIEW.md P4)' },
+  { pattern: 'kinds.*.applicable_to', owner: 'checkPatternApplication', status: 'implemented', reason: 'значение из profile.yaml — умолчание; frontmatter файла паттерна может переопределить (docs/history/engine-audit-2026-08-30.md P4)' },
   { pattern: 'kinds.*.lifecycle', owner: 'checkLifecycle', status: 'implemented', reason: 'status страницы обязан входить в закрытый список вида' },
 
   { pattern: 'non_domain_outcomes', owner: 'cmdOutcomes', status: 'implemented', reason: '' },
 
-  { pattern: 'outcomes.closed', owner: 'checkOutcomesFormat', status: 'implemented', reason: 'при closed:false проверка E-OUTCOMES-NOT-CLOSED выключается (REVIEW.md P6)' },
-  { pattern: 'outcomes.auto_fix', owner: 'checkAutoFixForbidden', status: 'implemented', reason: 'единственное поддерживаемое значение — "forbidden" (авто-исправления в CLI нет физически); любое другое значение — находка о несоответствии профиля возможностям инструмента (REVIEW.md P7)' },
+  { pattern: 'outcomes.closed', owner: 'checkOutcomesFormat', status: 'implemented', reason: 'при closed:false проверка E-OUTCOMES-NOT-CLOSED выключается (docs/history/engine-audit-2026-08-30.md P6)' },
+  { pattern: 'outcomes.auto_fix', owner: 'checkAutoFixForbidden', status: 'implemented', reason: 'единственное поддерживаемое значение — "forbidden" (авто-исправления в CLI нет физически); любое другое значение — находка о несоответствии профиля возможностям инструмента (docs/history/engine-audit-2026-08-30.md P7)' },
   { pattern: 'outcomes.partition_must_be_total', owner: 'checkPartitions', status: 'implemented', reason: '' },
   { pattern: 'outcomes.combinations.require_total', owner: 'checkCombinations', status: 'implemented', reason: '' },
   { pattern: 'outcomes.combinations.require_disjoint', owner: 'checkCombinations', status: 'implemented', reason: '' },
 
   { pattern: 'norm_kinds.*.evidence', owner: 'checkEvidenceMissing', status: 'implemented', reason: '' },
-  { pattern: 'norm_kinds.*.any_of', owner: 'checkEvidenceMissing', status: 'implemented', reason: 'при any_of не true требуется присутствие ВСЕХ типов evidence из списка, а не любого одного (REVIEW.md P1)' },
+  { pattern: 'norm_kinds.*.any_of', owner: 'checkEvidenceMissing', status: 'implemented', reason: 'при any_of не true требуется присутствие ВСЕХ типов evidence из списка, а не любого одного (docs/history/engine-audit-2026-08-30.md P1)' },
 
-  { pattern: 'slices.*.seed', owner: 'reviewSlice (spec.mjs context --seed-files/--seed-git); контекстно — cmdOutcomes/why для "символ"/"норма"', status: 'implemented', reason: 'засев по типу узла ("норма", "символ") читается контекстно самой командой (context/why); засев списком изменённых файлов (срез "review") — `spec.mjs context --slice review --seed-files <файл>` либо `--seed-git <ref>` (REVIEW.md P2, задание фазы 2 п.3)' },
+  { pattern: 'slices.*.seed', owner: 'reviewSlice (spec.mjs context --seed-files/--seed-git); контекстно — cmdOutcomes/why для "символ"/"норма"', status: 'implemented', reason: 'засев по типу узла ("норма", "символ") читается контекстно самой командой (context/why); засев списком изменённых файлов (срез "review") — `spec.mjs context --slice review --seed-files <файл>` либо `--seed-git <ref>` (docs/history/engine-audit-2026-08-30.md P2, задание фазы 2 п.3)' },
   { pattern: 'slices.*.follow', owner: 'contextSlice', status: 'implemented', reason: '' },
   { pattern: 'slices.*.cross_context', owner: 'contextSlice', status: 'implemented', reason: '' },
 

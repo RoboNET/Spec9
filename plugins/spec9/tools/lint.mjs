@@ -307,7 +307,7 @@ function checkCausalCompleteness(repo) {
 
 /**
  * E-LINK-NOT-ALLOWED — реализация `kinds.<вид>.links.may_reference`
- * (REVIEW.md C2): relation, разрешённая по контексту,
+ * (docs/history/engine-audit-2026-08-30.md C2): relation, разрешённая по контексту,
  * может ссылаться на терм, чей вид не входит в список легальных связей ИЗ
  * вида файла-источника. Раньше это ключевое обещание профиля не читалось
  * НИГДЕ (0 вхождений в коде): ссылка `политика → паттерн`, запрещённая
@@ -527,7 +527,7 @@ function checkEvidenceMissing(repo) {
       // any_of:true — достаточно одного из перечисленных типов (напр.
       // "контракт": evidence из schema ИЛИ test). Без any_of профиль
       // объявляет "нужны ВСЕ" — по умолчанию код читал это как "любой из"
-      // независимо от флага (REVIEW.md P1); безвредно, пока ни один тип
+      // независимо от флага (docs/history/engine-audit-2026-08-30.md P1); безвредно, пока ни один тип
       // нормы не объявляет несколько evidence без any_of, но флаг обязан
       // что-то значить сам по себе.
       const satisfied = spec.any_of
@@ -568,7 +568,7 @@ function checkAnchors(repo) {
 
 /**
  * W-SOURCE-UNREADABLE — директория или симлинк внутри `sources:`, которые
- * обход не смог прочитать (REVIEW.md M5). Раньше `findSpecFiles` глотал такие
+ * обход не смог прочитать (docs/history/engine-audit-2026-08-30.md M5). Раньше `findSpecFiles` глотал такие
  * случаи молча (`try { … } catch { return; }`), и целое поддерево спек
  * пропадало из линта без единого следа — "нарушений нет" по всему поддереву
  * неотличимо от "нарушений в нём никто не искал".
@@ -581,7 +581,7 @@ function checkSourceWarnings(repo) {
 
 /**
  * E-ANCHOR-UNPARSED — элемент frontmatter `anchors:`, не разобранный ни одной
- * известной формой якоря (REVIEW.md M4): опечатка в типе (`cod:` вместо
+ * известной формой якоря (docs/history/engine-audit-2026-08-30.md M4): опечатка в типе (`cod:` вместо
  * `code:`) или якорь без двоеточия раньше пропадал из `frontmatterAnchors`
  * молча — не было ни E-ANCHOR-BROKEN, ни отдельной находки, автор терял якорь
  * без единого сигнала об этом.
@@ -626,7 +626,7 @@ function anchorEscapeReason(fm, type) {
  * W-ENTITY-NO-TYPE-ANCHOR / E-KIND-ANCHOR-MISSING / W-KIND-ANCHOR-TYPE-UNLISTED /
  * W-NO-TYPE-ANCHOR-LEGACY / E-ANCHOR-UNPARSED —
  * реализация `kinds.<вид>.anchors.required` и `kinds.<вид>.anchors.optional`
- * ЦЕЛИКОМ, а не только ради значения `type` (REVIEW.md C2): раньше
+ * ЦЕЛИКОМ, а не только ради значения `type` (docs/history/engine-audit-2026-08-30.md C2): раньше
  * `операция: anchors.required: [code, test]`, `паттерн: [exemplar]`,
  * `событие: [test]`, `политика: [test]` не проверялись ничем — файл вида
  * "операция" вовсе без секции `anchors:` проходил линт молча.
@@ -679,7 +679,7 @@ function checkKindAnchors(repo) {
         out.push(mk(file.path, file.frontmatterStartLine, 'WARN', 'W-ENTITY-NO-TYPE-ANCHOR', `термин "${fm.id}" (kind=${fm.kind}) без обязательного якоря type: — ${reason}`));
         continue;
       }
-      // Обобщение частного escape-хетча no_type_anchor (REVIEW.md, п.1
+      // Обобщение частного escape-хетча no_type_anchor (docs/history/engine-audit-2026-08-30.md, п.1
       // задания второй фазы): сущность-актор вида "оператор устройства" —
       // человек, у неё нет ни type:, ни code:-якоря, и оба отсутствия
       // законны, если названа причина. "no_anchor: { code: <причина> }"
@@ -728,7 +728,7 @@ function checkPatternApplication(repo) {
       // правдоподобная опечатка автора (список имён вместо списка объектов:
       // "- fail-closed" вместо "- pattern: fail-closed"). Раньше это молча
       // пропускалось: паттерн не применялся, обязательства не вычислялись,
-      // и никакой находки не было (REVIEW.md H2).
+      // и никакой находки не было (docs/history/engine-audit-2026-08-30.md H2).
       if (!app || typeof app !== 'object' || Array.isArray(app) || typeof app.pattern !== 'string' || app.pattern.trim() === '') {
         out.push(mk(file.path, line, 'ERROR', 'E-PATTERN-MALFORMED', `элемент applies: не является объектом вида "{pattern: <имя>}": ${JSON.stringify(app)}`));
         continue;
@@ -742,7 +742,7 @@ function checkPatternApplication(repo) {
         // случай важнее общего); если в frontmatter поля нет — умолчание
         // берётся из kinds.<вид-паттерна>.applicable_to профиля. Раньше
         // профильное значение не читалось вовсе, и каждый файл паттерна
-        // был обязан повторять список у себя (REVIEW.md P4).
+        // был обязан повторять список у себя (docs/history/engine-audit-2026-08-30.md P4).
         const profileDefault = repo.profile.kinds && repo.profile.kinds[reg.entity.kind] && Array.isArray(repo.profile.kinds[reg.entity.kind].applicable_to)
           ? repo.profile.kinds[reg.entity.kind].applicable_to
           : [];
@@ -789,7 +789,7 @@ function checkObligationEvidence(repo) {
  * "rejected_alternative", без непустой секции "## Отвергнутые альтернативы".
  * Раньше проверка была захардкожена на `repo.decisionKind` (определяется
  * через `append_only`, отдельный ключ) вместо чтения `must` — вид с этим
- * требованием, но без `append_only`, был бы не покрыт (REVIEW.md C2).
+ * требованием, но без `append_only`, был бы не покрыт (docs/history/engine-audit-2026-08-30.md C2).
  * @param {import('./graph.mjs').Repo} repo
  * @returns {Finding[]}
  */
@@ -884,7 +884,7 @@ function checkDecisionGraph(repo) {
  * источник — норму или операцию, которая его порождает (profile.yaml,
  * комментарий у `kinds.событие`). Операционально это входящая ссылка от
  * ЧУЖОГО термина/нормы — сам термин на себя сослаться источником быть
- * не может. Раньше `must: [producer]` не читался нигде (REVIEW.md C2).
+ * не может. Раньше `must: [producer]` не читался нигде (docs/history/engine-audit-2026-08-30.md C2).
  * @param {import('./graph.mjs').Repo} repo
  * @returns {Finding[]}
  */
@@ -913,7 +913,7 @@ function checkKindMustProducer(repo) {
 function checkDecisionOrphan(repo) {
   const out = [];
   if (!repo.decisionKind) return out;
-  // Ключ — контекст+id, не голый id (REVIEW.md M11): решение "ADR-1" в
+  // Ключ — контекст+id, не голый id (docs/history/engine-audit-2026-08-30.md M11): решение "ADR-1" в
   // контексте auth не считалось orphan-ом только потому, что термин "ADR-1"
   // существовал в другом контексте и на НЕГО была ссылка — уникальность id
   // гарантирована только парой контекст+id (см. checkIdDup), а множество
@@ -951,7 +951,7 @@ function checkDecisionOrphan(repo) {
  */
 function checkTermOrphan(repo) {
   const out = [];
-  // Ключ — контекст+id (REVIEW.md M11, тот же класс, что и W-DECISION-ORPHAN
+  // Ключ — контекст+id (docs/history/engine-audit-2026-08-30.md M11, тот же класс, что и W-DECISION-ORPHAN
   // выше): голый id глушил находку, если однофамилец из ЧУЖОГО контекста
   // имел исходящую/входящую ссылку.
   const incoming = new Set();
@@ -1004,7 +1004,7 @@ function scenarioBodiesInRange(file, start, end) {
  * в `text` как самостоятельные токены. Проверка подстрокой (`text.includes(v)`)
  * ложно засчитывает исход покрытым, если он — суффикс ДРУГОГО, более длинного
  * исхода из того же набора: `"не отозвано".includes("отозвано")` истинно,
- * хотя сценарий говорит про противоположный исход (REVIEW.md H4). Здесь
+ * хотя сценарий говорит про противоположный исход (docs/history/engine-audit-2026-08-30.md H4). Здесь
  * значения ищутся ОДНОЙ альтернацией, отсортированной по убыванию длины,
  * с границей токена по обеим сторонам (`\b` не годится — JS не считает
  * кириллицу "словесными" символами, тот же нюанс, что у RU_OPERATOR_RE в
@@ -1072,7 +1072,7 @@ function checkOutcomesFormat(repo) {
   const out = [];
   // profile.yaml: outcomes.closed — "множество исходов операции замкнуто".
   // Раньше проверка была безусловной независимо от значения ключа: закрытость
-  // нельзя было выключить через профиль (REVIEW.md P6). Умолчание true —
+  // нельзя было выключить через профиль (docs/history/engine-audit-2026-08-30.md P6). Умолчание true —
   // историческое поведение сохраняется, когда ключ не задан вовсе.
   const requireClosed = !(repo.profile.outcomes && repo.profile.outcomes.closed === false);
   for (const file of repo.files) {
@@ -1181,7 +1181,7 @@ function checkCombinations(repo) {
   const out = [];
   const cfg = (repo.profile.outcomes && repo.profile.outcomes.combinations) || {};
   for (const file of repo.files) {
-    // Файл может нести НЕСКОЛЬКО разделов "## Combinations" (REVIEW.md M6) —
+    // Файл может нести НЕСКОЛЬКО разделов "## Combinations" (docs/history/engine-audit-2026-08-30.md M6) —
     // раньше проверялся только первый, и второй проходил линт молча.
     for (const table of file.combinations) {
     // Combinations синтаксически не привязан к одному требованию — сверяем
@@ -1219,13 +1219,13 @@ function checkCombinations(repo) {
       // Раздел "## Combinations" присутствует, строки таблицы присутствуют,
       // но НИ ОДНОГО измерения не распознано — раньше это пропускалось молча
       // (проверка полноты просто не запускалась, и нигде не сообщалось, что
-      // она вообще не состоялась). REVIEW.md H3: "путь Б".
+      // она вообще не состоялась). docs/history/engine-audit-2026-08-30.md H3: "путь Б".
       out.push(mk(file.path, table.sectionLine, 'ERROR', 'E-COMBINATIONS-NO-DIMENSIONS', 'раздел "## Combinations" содержит таблицу, но ни одного измерения не распознано — проверка полноты и непересечения НЕ выполнена'));
       continue;
     }
     if (table.dims.some((d) => d.values.length === 0)) continue; // E-COMBINATIONS-DIM-EMPTY уже сообщено выше — считать нечего
 
-    // REVIEW.md M10: декартово произведение измерений материализуется целиком
+    // docs/history/engine-audit-2026-08-30.md M10: декартово произведение измерений материализуется целиком
     // ДО начала анализа (`analyzeCoverage` → `cartesianProduct`), а `uncovered`
     // может вырасти до полного размера произведения. Восемь измерений по пять
     // значений уже дают 390 625 сочетаний, а `analyzeCoverage` дополнительно
@@ -1250,7 +1250,7 @@ function checkCombinations(repo) {
       out.push(mk(file.path, table.sectionLine, 'ERROR', 'E-COMBINATIONS-NOT-TOTAL', `таблица не покрывает ${uncovered.length} сочетаний из ${total}: ${sample}${more}`));
     }
 
-    // REVIEW.md M16: строка "**НЕ ОПРЕДЕЛЕНО**" — легальная задокументированная
+    // docs/history/engine-audit-2026-08-30.md M16: строка "**НЕ ОПРЕДЕЛЕНО**" — легальная задокументированная
     // дыра (W-COMBINATIONS-UNDEFINED-ROW уже сообщил о ней построчно), и она
     // ЗАСЧИТЫВАЕТСЯ как покрытие в analyzeCoverage — иначе E-COMBINATIONS-NOT-TOTAL
     // срабатывал бы на каждой честно объявленной дыре. Но факт того, что часть
@@ -1272,7 +1272,7 @@ function checkCombinations(repo) {
         out.push(mk(file.path, table.sectionLine, 'ERROR', 'E-COMBINATIONS-OVERLAP', `и ещё ${overlaps.length - 10} пересекающихся сочетаний не показаны`));
       }
     }
-    } // конец цикла по всем разделам "## Combinations" файла (REVIEW.md M6)
+    } // конец цикла по всем разделам "## Combinations" файла (docs/history/engine-audit-2026-08-30.md M6)
   }
   return out;
 }
@@ -1282,7 +1282,7 @@ function checkCombinations(repo) {
  * значением, отличным от "forbidden". Единственное, что CLI умеет делать, —
  * не иметь `--fix` вовсе (конституция §10); профиль, обещающий иное
  * значение этого ключа, обещает возможность, которой физически нет
- * (REVIEW.md P7).
+ * (docs/history/engine-audit-2026-08-30.md P7).
  * @param {import('./graph.mjs').Repo} repo
  * @returns {Finding[]}
  */
@@ -1294,7 +1294,7 @@ function checkAutoFixForbidden(repo) {
 
 /**
  * E-PROFILE-KEY-UNREGISTERED / W-PROFILE-KEY-NOT-IMPLEMENTED — реестр
- * владения ключами profile.yaml (см. profile-registry.mjs, REVIEW.md C2).
+ * владения ключами profile.yaml (см. profile-registry.mjs, docs/history/engine-audit-2026-08-30.md C2).
  * Каждый присутствующий в профиле ключ обязан иметь владельца: проверку,
  * которая его читает, либо явную запись "не реализовано, потому что…".
  * Ключ без ни одной из двух записей — E-PROFILE-KEY-UNREGISTERED: профиль

@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
+import { parse as parseYaml } from 'yaml';
 
 const root = path.resolve(import.meta.dirname, '..');
 const pluginRoot = path.join(root, 'plugins', 'spec9');
@@ -21,6 +22,8 @@ const codex = readJson('plugins/spec9/.codex-plugin/plugin.json');
 const claude = readJson('plugins/spec9/.claude-plugin/plugin.json');
 const codexMarketplace = readJson('.agents/plugins/marketplace.json');
 const claudeMarketplace = readJson('.claude-plugin/marketplace.json');
+const publishWorkflowText = fs.readFileSync(path.join(root, '.github', 'workflows', 'publish-npm.yml'), 'utf8');
+const publishWorkflow = parseYaml(publishWorkflowText);
 
 for (const manifest of [codex, claude]) {
   assert(manifest.name === 'spec9', 'plugin manifest name must be spec9');
@@ -29,8 +32,17 @@ for (const manifest of [codex, claude]) {
   assert(manifest.license === 'MIT', 'both manifests must declare the MIT license');
 }
 assert(packageJson.license === 'MIT', 'package.json must declare the MIT license');
+assert(packageJson.repository?.url === 'git+https://github.com/RoboNET/Spec9.git', 'package repository must match RoboNET/Spec9');
+assert(packageJson.publishConfig?.access === 'public', 'npm package must publish with public access');
 assert(codexMarketplace.plugins?.[0]?.source?.path === './plugins/spec9', 'Codex marketplace source must be ./plugins/spec9');
 assert(claudeMarketplace.plugins?.[0]?.source === './plugins/spec9', 'Claude marketplace source must be ./plugins/spec9');
+assert(publishWorkflow?.on?.release?.types?.includes('published'), 'npm publish workflow must run only after a release is published');
+assert(publishWorkflow?.jobs?.publish?.permissions?.['id-token'] === 'write', 'npm publish job must request an OIDC identity token');
+assert(publishWorkflow?.jobs?.publish?.permissions?.contents === 'read', 'npm publish job must keep repository access read-only');
+assert(publishWorkflow?.jobs?.publish?.['timeout-minutes'] === 10, 'npm publish job must have a bounded timeout');
+assert(publishWorkflowText.includes('node-version: "24"'), 'npm publish workflow must use Node.js 24');
+assert(publishWorkflowText.includes('npm publish'), 'npm publish workflow must contain the publish command');
+assert(!publishWorkflowText.includes('NPM_TOKEN'), 'npm publish workflow must not use a long-lived NPM_TOKEN');
 
 const skillsRoot = path.join(pluginRoot, 'skills');
 const skillNames = fs.readdirSync(skillsRoot, { withFileTypes: true })

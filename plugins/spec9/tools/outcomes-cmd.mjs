@@ -49,7 +49,7 @@ function formatDiscrepancy(reqId, symbol, variant) {
  * Раньше все эти пути возвращали `hasDiscrepancy: false` неотличимо от
  * настоящей полной сверки — команда-страж собственного правила fail-closed
  * (паттерн FC-002) нарушала его сама: отказ по существу был неотличим от
- * невозможности проверить (см. REVIEW.md C3).
+ * невозможности проверить (см. docs/history/engine-audit-2026-08-30.md C3).
  * @typedef {'ok'|'discrepancy'|'unchecked'} OutcomesStatus
  */
 
@@ -65,7 +65,7 @@ export function cmdOutcomes(repo, reqId) {
     return { text: `требование "${reqId}" не найдено — ПРОВЕРКА НЕ СОСТОЯЛАСЬ`, hasDiscrepancy: false, status: 'unchecked' };
   }
   const { file, req } = found;
-  // REVIEW.md M17: профиль требует `code:` именно во frontmatter термина
+  // docs/history/engine-audit-2026-08-30.md M17: профиль требует `code:` именно во frontmatter термина
   // (`kinds.операция.anchors.required: [code, test]`) — команда читала
   // только `req.evidenceAnchors` (Evidence-строки ПОД заголовком требования)
   // и для операции, оформленной строго по профилю, говорила "нет code:-якоря
@@ -160,7 +160,7 @@ export function cmdOutcomes(repo, reqId) {
     // (напр. confidence:"shallow" — тип возврата не аннотирован): цикл
     // ниже не выполнится ни разу, и без этой пометки якорь молча
     // засчитался бы как "всё сопоставлено" при нуле сравнений
-    // (воспроизведено Codex на реальном outcomes REV-002, см. REVIEW.md C3).
+    // (воспроизведено Codex на реальном outcomes REV-002, см. docs/history/engine-audit-2026-08-30.md C3).
     if (variants.length === 0) {
       blocks.push(
         `якорь ${anchor.type}:${anchor.target} (символ "${anchor.symbol}") — адаптер не извлёк ни одного ` +

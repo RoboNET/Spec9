@@ -95,7 +95,7 @@ test('extractOutcomes (ts): символ не найден — null', () => {
 
 test('extractOutcomes (ts) [C7]: throw без завершающей точки с запятой (ASI) не теряется', () => {
   // Тело намеренно не содержит НИ ОДНОЙ ";" после throw — старый THROW_STMT_RE
-  // требовал ";" и на этом входе не находил throw вовсе (см. REVIEW.md C7).
+  // требовал ";" и на этом входе не находил throw вовсе (см. docs/history/engine-audit-2026-08-30.md C7).
   const source = 'export function f(): number {\n  throw new Error("boom")\n}\n';
   const r = extractOutcomes(source, 'f');
   assert.ok(r.escaping.includes('throw new Error'), `throw без ";" потерян бесследно: escaping=${JSON.stringify(r.escaping)} unresolved=${JSON.stringify(r.unresolved)} (C7)`);

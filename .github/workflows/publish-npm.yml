@@ -1,0 +1,55 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+concurrency:
+  group: npm-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ github.event.release.tag_name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Validate release metadata
+        id: release
+        env:
+          SPEC9_RELEASE_TAG: ${{ github.event.release.tag_name }}
+          SPEC9_RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: node scripts/verify-release.mjs
+
+      - name: Validate distribution
+        run: npm run validate
+
+      - name: Inspect package contents
+        run: npm pack --dry-run
+
+      - name: Publish to npm
+        env:
+          SPEC9_NPM_DIST_TAG: ${{ steps.release.outputs.dist-tag }}
+        run: npm publish --tag "$SPEC9_NPM_DIST_TAG"

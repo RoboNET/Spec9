@@ -99,7 +99,7 @@ export function loadRepo(root, productRoot = root) {
   }
 
   // Индекс требований по ID — построен один раз здесь, а не линейным сканом
-  // всех файлов на каждый вызов (REVIEW.md M9: `findRequirement` в slice.mjs
+  // всех файлов на каждый вызов (docs/history/engine-audit-2026-08-30.md M9: `findRequirement` в slice.mjs
   // сканировал repo.files × file.requirements внутри поэрёберного цикла).
   const requirementsById = new Map();
   for (const file of files) {
@@ -169,7 +169,7 @@ function isIdentChar(ch) {
 /**
  * Ищет `needle` в `haystack` как ЦЕЛЫЙ токен — по обеим сторонам совпадения
  * не должно быть идентификаторного символа. Простое `content.includes(...)`
- * (REVIEW.md H5) резольвит `check_revocation` внутри `check_revocation_disabled`
+ * (docs/history/engine-audit-2026-08-30.md H5) резольвит `check_revocation` внутри `check_revocation_disabled`
  * и держит якорь "разрешённым" после удаления самой функции — а также
  * вырождается в тождественную истину для коротких символов (`new`, `id`).
  * @param {string} haystack
@@ -199,7 +199,7 @@ export function resolveAnchor(anchor, root) {
   const filePath = path.resolve(resolvedRoot, anchor.file);
   // `path.join`/`path.resolve` не ограничены корнем сами по себе — якорь
   // `code:../../etc/passwd` резольвился бы наружу репозитория молча
-  // (REVIEW.md H5). Разрешённый путь обязан остаться ВНУТРИ resolvedRoot.
+  // (docs/history/engine-audit-2026-08-30.md H5). Разрешённый путь обязан остаться ВНУТРИ resolvedRoot.
   const rel = path.relative(resolvedRoot, filePath);
   if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
     return { ok: false, reason: `якорь выходит за пределы корня репозитория: ${anchor.file}` };
@@ -213,7 +213,7 @@ export function resolveAnchor(anchor, root) {
   }
   if (!stat.isFile()) {
     // fs.existsSync истинен и для директорий: code:crates/ резольвился бы
-    // как "существующий файл" (REVIEW.md H5).
+    // как "существующий файл" (docs/history/engine-audit-2026-08-30.md H5).
     return { ok: false, reason: `путь не является файлом: ${anchor.file}` };
   }
   if (anchor.symbol) {
@@ -356,7 +356,7 @@ export function buildGraph(repo) {
   }
 
   // Построен один раз здесь, а не линейным сканом `nodes.find(...)` на каждый
-  // поиск узла (REVIEW.md M9): при 500+ файлах поэрёберный обход в slice.mjs
+  // поиск узла (docs/history/engine-audit-2026-08-30.md M9): при 500+ файлах поэрёберный обход в slice.mjs
   // становится O(E·N).
   const nodesById = new Map(nodes.map((n) => [n.id, n]));
 

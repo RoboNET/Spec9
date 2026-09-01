@@ -11,6 +11,10 @@ This repository is three distributions backed by one source tree:
 - a Codex plugin and marketplace;
 - a Claude Code plugin and marketplace.
 
+The engine also describes itself with Spec9 under `spec9/`. Its README is the
+top-down review entry point; `npm run validate:self` checks that specification
+with the engine it describes.
+
 The shared plugin lives in `plugins/spec9/`. Skills, format documentation, tools, and
 documentation are never copied into vendor-specific variants.
 
@@ -96,3 +100,30 @@ npm pack --dry-run
 
 The package and both plugin manifests share one release version. This is a
 distribution version, not a version field inside product specifications.
+
+## Publishing releases
+
+Publishing is handled by `.github/workflows/publish-npm.yml` through npm Trusted
+Publishing. To release a version:
+
+1. Update `version` in `package.json` and `package-lock.json`. The plugin
+   manifests are checked against that version by `npm run validate`.
+2. Merge the version change to `main` and create a GitHub Release whose tag is
+   exactly `v<version>`, for example `v0.1.0`.
+3. Publishing the GitHub Release validates, packs, and publishes the package.
+   Stable versions use the npm `latest` tag; SemVer prereleases use `next`.
+
+The npm package must configure this trusted publisher before the workflow can
+authenticate:
+
+- provider: GitHub Actions;
+- organization: `RoboNET`;
+- repository: `Spec9`;
+- workflow filename: `publish-npm.yml`;
+- allowed action: `npm publish`.
+
+Trusted Publishing requires the package to exist on npm first. Bootstrap the
+initial package version once with a short-lived granular npm token, configure
+the trusted publisher above, revoke the bootstrap token, and use GitHub Releases
+for every later publication. Do not add an `NPM_TOKEN` repository secret for the
+steady-state workflow.

@@ -3,6 +3,17 @@
   "version": "0.1.0",
   "description": "Domain-addressable specification engine and review tooling",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RoboNET/Spec9.git"
+  },
+  "homepage": "https://github.com/RoboNET/Spec9#readme",
+  "bugs": {
+    "url": "https://github.com/RoboNET/Spec9/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "spec9": "plugins/spec9/tools/spec.mjs"
@@ -26,10 +37,11 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node --test plugins/spec9/tools/*.test.mjs plugins/spec9/tools/adapters/*.test.mjs",
+    "test": "node --test plugins/spec9/tools/*.test.mjs plugins/spec9/tools/adapters/*.test.mjs scripts/*.test.mjs",
     "validate:skill": "npm run validate:skills",
     "validate:skills": "node scripts/validate-distribution.mjs",
-    "validate": "npm run validate:skills && npm test"
+    "validate:self": "node plugins/spec9/tools/spec.mjs --spec-root spec9 --product-root . lint",
+    "validate": "npm run validate:skills && npm run validate:self && npm test"
   },
   "dependencies": {
     "yaml": "^2.8.1"

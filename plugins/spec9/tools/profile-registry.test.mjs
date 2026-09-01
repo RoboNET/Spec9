@@ -1,4 +1,4 @@
-// Тесты реестра владения ключами profile.yaml (C2, REVIEW.md).
+// Тесты реестра владения ключами profile.yaml (C2, docs/history/engine-audit-2026-08-30.md).
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

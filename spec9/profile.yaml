@@ -1,0 +1,92 @@
+profile: spec9-engine
+
+sources: [terms, contracts, processes, decisions]
+
+relation_types:
+  references:  { cardinality: many }
+  depends_on:  { cardinality: many, sources: [component], targets: [component, contract] }
+  implements:  { cardinality: many, sources: [component], targets: [contract] }
+  triggered_by: { cardinality: one, sources: [process], targets: [component, contract], flow: reverse }
+  invokes:     { cardinality: many, sources: [process], targets: [component], flow: forward }
+  publishes:   { cardinality: one, sources: [process], targets: [contract], flow: forward }
+  affects:     { cardinality: many, sources: [decision], targets: [component, contract, process] }
+  replaces:    { cardinality: many, sources: [decision], targets: [decision] }
+  revokes:     { cardinality: many, sources: [decision], targets: [decision] }
+
+contexts:
+  engine:
+    title: Specification engine
+    prefix: [ENG, FMT, GRF, LNT, REV, CLI]
+  delivery:
+    title: Package and agent delivery
+    prefix: [DST, PKG, PLG, PUB]
+
+kinds:
+  component:
+    title: Executable engine subsystem
+    anchors: { required: [code, test] }
+    links: { may_reference: [component, contract, process, decision] }
+
+  contract:
+    title: Published format or distribution boundary
+    review_role: boundary
+    required_fields: [owner, compatibility]
+    required_sections: [Boundary, Compatibility, Failures]
+    anchors: { required: [schema, test], optional: [code, type] }
+    links: { may_reference: [component, contract, process, decision] }
+
+  process:
+    title: Causal workflow spanning engine components or an external registry
+    anchors: { required: [code, test] }
+    must: [outcomes]
+    links: { may_reference: [component, contract, process, decision] }
+
+  decision:
+    title: Architectural choice with a rejected alternative
+    append_only: true
+    lifecycle: [proposed, accepted]
+    required_fields: [status, date, relations.affects]
+    required_sections: [Context, Decision, Rejected alternatives, Reconsider when]
+
+norm_kinds:
+  invariant:   { evidence: [test] }
+  contract:    { evidence: [schema, test], any_of: true }
+  operational: { evidence: [code, test], any_of: true }
+  permission:  { evidence: [] }
+  liveness:    { evidence: [test] }
+
+outcomes:
+  closed: true
+  auto_fix: forbidden
+  partition_must_be_total: true
+  combinations:
+    require_total: true
+    require_disjoint: true
+
+slices:
+  implement:
+    seed: [requirement]
+    follow:
+      - { edge: subject, load: full }
+      - { edge: evidence, load: full }
+      - { edge: decision, load: heading }
+      - { edge: reverse, load: names, hops: 1 }
+    cross_context: contract_only
+
+  why:
+    seed: [symbol, requirement]
+    follow:
+      - { edge: reverse, load: full, hops: 2 }
+      - { edge: decision, load: full }
+    cross_context: contract_only
+
+  review:
+    seed: [changed-files]
+    follow:
+      - { edge: reverse, load: names, hops: 1 }
+      - { edge: evidence, load: names }
+    cross_context: open
+
+budget:
+  max_files: 25
+  on_exhaustion: degrade_to_names
