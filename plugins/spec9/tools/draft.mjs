@@ -47,6 +47,8 @@ export function draftPage(repo, kind, qualifiedId, name = 'TODO: name') {
 
   const frontmatter = { id, kind, context, name };
   for (const field of kindDef.required_fields || []) {
+    // Identity values supplied by the author already satisfy required fields.
+    if (Object.hasOwn(frontmatter, field)) continue;
     setPath(frontmatter, field, placeholderFor(field, repo.profile, kindDef));
   }
 

@@ -6,6 +6,7 @@ import { cmdOutcomes } from './outcomes-cmd.mjs';
 import { auditE2E } from './e2e-audit.mjs';
 import { buildOpenSpecCoverage } from './openspec-coverage.mjs';
 import { buildQualityReport } from './quality.mjs';
+import { buildDeliveryReport } from './delivery.mjs';
 
 export function buildDoctorReport(repo) {
   const findings = lint(repo);
@@ -27,6 +28,7 @@ export function buildDoctorReport(repo) {
   const e2e = auditE2E(repo);
   const openspec = buildOpenSpecCoverage(repo);
   const quality = buildQualityReport(repo);
+  const delivery = buildDeliveryReport(repo);
   const graph = buildGraph(repo);
   const outcomeCounts = { ok: 0, discrepancy: 0, unchecked: 0 };
   for (const check of outcomeChecks) outcomeCounts[check.status]++;
@@ -68,6 +70,7 @@ export function buildDoctorReport(repo) {
     candidates: { pending: candidates.length, rows: candidates },
     e2e,
     openspec,
+    delivery,
   };
 }
 
@@ -86,6 +89,10 @@ export function formatDoctorReport(report) {
       ? `openspec    ${report.openspec.counts.covered}/${report.openspec.total} covered / ${report.openspec.counts.missing} missing / ${report.openspec.counts.duplicate} duplicate / ${report.openspec.counts.unknown} unknown`
       : `migration   ${report.openspec.levels.preserved} preserved / ${report.openspec.levels.modeled} modeled / ${report.openspec.levels.verified} verified`,
   ];
+  if (report.delivery?.enabled) {
+    const { current, missing, stale, duplicate, invalid } = report.delivery.summary;
+    lines.push(`delivery    ${current} current / ${missing} missing / ${stale} stale / ${duplicate} duplicate / ${invalid} invalid`);
+  }
   if (report.lint.findings.length) {
     lines.push('', 'Lint:');
     for (const item of report.lint.findings) lines.push(`- ${item.code}: ${item.message}`);

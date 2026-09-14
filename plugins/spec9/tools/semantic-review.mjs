@@ -1,5 +1,6 @@
 import { buildReviewImpact } from './review-impact.mjs';
 import { diffBoundaryShapes, readBoundaryShape } from './boundary-adapters.mjs';
+import { requirementSemantic } from './requirement-semantic.mjs';
 
 const OMITTED_PROPERTIES = new Set(['id', 'context', 'kind', 'name', 'status', 'anchors', 'relations', 'requirements']);
 
@@ -40,12 +41,6 @@ function proseOutsideRequirements(file) {
   return normalizeText(lines.join('\n'));
 }
 
-function requirementProse(file, req) {
-  const start = Math.max(0, req.sectionStart - file.bodyStartLine);
-  const end = Math.min(file.bodyLines.length, req.sectionEnd - file.bodyStartLine);
-  return normalizeText(file.bodyLines.slice(start, end).join('\n'));
-}
-
 function semanticSnapshot(repo) {
   const terms = new Map();
   const requirements = new Map();
@@ -79,25 +74,14 @@ function semanticSnapshot(repo) {
 
     for (const req of file.requirements) {
       if (!req.id) continue;
-      const norms = file.norms
-        .filter((norm) => norm.startLine >= req.sectionStart && norm.startLine < req.sectionEnd)
-        .map((norm) => normalizeText(norm.sentenceText));
-      const reqId = req.qualifiedId || `${entity.context}.${req.id}`;
+      const semantic = requirementSemantic(entity, req);
+      const reqId = semantic.id;
       requirements.set(reqId, {
-        id: reqId,
+        ...semantic,
         context: entity.context,
-        owner: id,
         path: entity.path,
         specPath: `${repo.specPathPrefix}${entity.path}`,
-        kind: req.kindAttr,
-        title: req.title,
-        subjects: sorted(req.subjects),
-        outcomes: sorted(req.outcomes?.values || []),
-        partitions: canonical(req.partitions.map((partition) => ({ outcome: partition.outcome, classes: sorted(partition.classes), total: partition.total }))),
         origins: sorted(req.origins || []),
-        decidedBy: sorted(req.decidedBy || []),
-        norms,
-        prose: requirementProse(file, req),
       });
       for (const anchor of req.evidenceAnchors) {
         const key = anchorKey(reqId, anchor);

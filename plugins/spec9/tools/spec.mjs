@@ -22,6 +22,7 @@ import { buildNextQueue, formatNextQueue } from './next.mjs';
 import { buildChangeReport, formatChangeReport } from './change.mjs';
 import { loadRepoAtGitRef, changedFilesBetweenRepositories } from './git-snapshot.mjs';
 import { buildSemanticReview, formatSemanticReview } from './semantic-review.mjs';
+import { requirementFingerprint } from './requirement-semantic.mjs';
 
 // CLI output must survive `| head`, `| grep`, and any consumer that closes the
 // pipe before all output is written. Without an stdout error handler, a closed
@@ -81,6 +82,7 @@ function usage() {
       '  spec9 draft <kind> <context.id> --name <name>      (page skeleton on stdout)',
       '  spec9 trace [<requirement-id|context.id>] [--missing] [--json]',
       '  spec9 decision <context.ADR-id> [--json]',
+      '  spec9 delivery fingerprint <context.REQ-ID> [--json]  (read-only current edition)',
       '  spec9 context <id> --slice <implement|why|review>',
       '  spec9 context --slice review --seed-files <path-list-file>',
       '  spec9 context --slice review --seed-git <git-ref>   (uses "git diff --name-only <ref>")',
@@ -150,6 +152,21 @@ function main(argv) {
   SPEC9_ROOT = roots.specRoot;
   PRODUCT_ROOT = roots.productRoot;
   const [cmd, ...rest] = roots.args;
+
+  if (cmd === 'delivery') {
+    const args = rest.filter((arg) => arg !== '--json');
+    if (args.length !== 2 || args[0] !== 'fingerprint' || rest.filter((arg) => arg === '--json').length > 1) usage();
+    const id = args[1];
+    if (!/^[^.\s]+\.[^.\s]+$/u.test(id)) throw new Error('delivery fingerprint requires a qualified requirement ID (context.REQ-ID)');
+    const repo = loadRepo(SPEC9_ROOT, PRODUCT_ROOT);
+    const entry = Map.prototype.get.call(repo.requirementsById, id);
+    if (!entry) throw new Error(`requirement "${id}" not found`);
+    const entity = repo.entitiesByContextId.get(`${entry.file.frontmatter.context} ${entry.file.frontmatter.id}`);
+    if (!entity) throw new Error(`requirement "${id}" has no valid owner`);
+    const fingerprint = requirementFingerprint(entity, entry.req);
+    process.stdout.write((rest.includes('--json') ? JSON.stringify({ id, fingerprint }, null, 2) : fingerprint) + '\n');
+    return;
+  }
 
   if (cmd === 'lint') {
     const repo = loadRepo(SPEC9_ROOT, PRODUCT_ROOT);

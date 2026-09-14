@@ -47,6 +47,30 @@ function repo(files) {
   return loadRepo(root, root);
 }
 
+test('semantic review ignores requirement set ordering but retains origin changes', () => {
+  const requirement = 'requirements:\n  AUTH-001:\n    kind: инвариант\n    subjects: [auth.a, auth.b]\n    partitions:\n      - { outcome: ok, classes: [a, b], total: true }\n      - { outcome: denied, classes: [c], total: false }\n';
+  const body = '### AUTH-001 — Rule\n[[auth.a]] MUST work.';
+  const base = repo({ 'terms/a.md': page({ id: 'a', requirement, body }) });
+  const reordered = requirement.replace('[auth.a, auth.b]', '[auth.b, auth.a]')
+    .replace('      - { outcome: ok, classes: [a, b], total: true }\n      - { outcome: denied, classes: [c], total: false }',
+      '      - { outcome: denied, classes: [c], total: false }\n      - { outcome: ok, classes: [b, a], total: true }');
+  const head = repo({ 'terms/a.md': page({ id: 'a', requirement: reordered, body }) });
+  assert.equal(buildSemanticDiff(base, head).requirements.modified.length, 0);
+  head.entities[0].file.requirements[0].origins.push('external/source');
+  assert.deepEqual(buildSemanticDiff(base, head).requirements.modified[0].fields, ['origins']);
+});
+
+test('semantic review ignores soft wrapping inside inline code', (t) => {
+  const requirement = 'requirements:\n  AUTH-001:\n    kind: инвариант\n    subjects: [auth.a]\n';
+  const base = repo({ 'terms/a.md': page({ id: 'a', requirement, body: '### AUTH-001 — Rule\n[[auth.a]] MUST return `some value`.' }) });
+  const head = repo({ 'terms/a.md': page({ id: 'a', requirement, body: '### AUTH-001 — Rule\n[[auth.a]] MUST return `some\nvalue`.' }) });
+  t.after(() => {
+    fs.rmSync(base.root, { recursive: true, force: true });
+    fs.rmSync(head.root, { recursive: true, force: true });
+  });
+  assert.equal(buildSemanticDiff(base, head).requirements.modified.length, 0);
+});
+
 test('semantic diff classifies domain changes and protects an accepted ADR', () => {
   const requirementBefore = 'requirements:\n  AUTH-001:\n    kind: инвариант\n    subjects: [auth.a]\n    outcomes: [ok]\n';
   const requirementAfter = 'requirements:\n  AUTH-001:\n    kind: инвариант\n    subjects: [auth.a]\n    outcomes: [ok, denied]\n';

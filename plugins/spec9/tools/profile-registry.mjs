@@ -78,7 +78,11 @@ export const MANIFEST = [
 
   { pattern: 'e2e.roots', owner: 'auditE2E', status: 'implemented', reason: 'declares one or more case registries relative to the product root for umbrella repositories' },
   { pattern: 'legacy.openspec_roots', owner: 'buildOpenSpecCoverage', status: 'implemented', reason: 'declares temporary migration roots, optional key prefixes, and active-change discovery' },
-  { pattern: 'repositories', owner: 'configuredGitRepositories + changedFilesBetweenRepositories + loadRepoAtGitRef', status: 'implemented', reason: 'declares Git roots combined by semantic review in an umbrella workspace' },
+  { pattern: 'delivery.kind', owner: 'buildDeliveryReport', status: 'implemented', reason: 'selects the profile-defined delivery entity kind' },
+  { pattern: 'delivery.status_roles.active', owner: 'buildDeliveryReport', status: 'implemented', reason: 'declares active delivery lifecycle states' },
+  { pattern: 'delivery.status_roles.completed', owner: 'buildDeliveryReport', status: 'implemented', reason: 'declares historical completed delivery states' },
+  { pattern: 'delivery.status_roles.cancelled', owner: 'buildDeliveryReport', status: 'implemented', reason: 'declares cancelled delivery states that grant no coverage' },
+  { pattern: 'repositories', owner: 'configuredGitRepositories + changedFilesBetweenRepositories + loadRepoAtGitRef + buildDeliveryReport', status: 'implemented', reason: 'declares Git roots combined by semantic review and repository IDs used by deliveries' },
   { pattern: 'review.capabilities', owner: 'checkReviewCapabilities + buildReviewImpact', status: 'implemented', reason: 'curates stable human entrypoints and groups changed handles above context and requirement detail' },
 
   { pattern: 'budget.max_files', owner: 'contextSlice (Budget)', status: 'implemented', reason: '' },

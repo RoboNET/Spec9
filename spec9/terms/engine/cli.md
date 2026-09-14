@@ -35,6 +35,12 @@ requirements:
     subjects: [engine.cli]
     evidence:
       test: [plugins/spec9/tools/extended-commands.test.mjs#CLI-004]
+  CLI-005:
+    kind: operational
+    subjects: [engine.cli]
+    evidence:
+      code: [plugins/spec9/tools/spec.mjs#main]
+      test: [plugins/spec9/tools/delivery-cli.test.mjs]
 ---
 
 # Spec9 command-line interface
@@ -65,3 +71,12 @@ specification values]] MAY remain in the product's domain language.
 file-level evidence. [[engine.cli|The command-line interface]] MUST be able to
 suggest exact `test:path#case-id` anchors. [[engine.cli|The command-line
 interface]] MUST NOT apply those suggestions automatically.
+
+### CLI-005 — Delivery fingerprints are read-only and health is enforceable
+
+[[engine.cli|The command-line interface]] MUST expose the current versioned
+requirement fingerprint in stable text and JSON forms through
+`delivery fingerprint context.REQ-ID`. [[engine.cli|The command-line interface]]
+MUST NOT rewrite recorded fingerprints. [[engine.cli|The command-line interface]]
+MUST include delivery integrity failures in lint and strict doctor exit status
+and display a separate delivery coverage summary when enabled.
