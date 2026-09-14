@@ -47,7 +47,9 @@ requirements:
     subjects: [engine.product-profile]
     evidence:
       schema: [spec9/profile.yaml]
-      test: [plugins/spec9/tools/frontmatter.test.mjs#lifecycle]
+      test:
+        - plugins/spec9/tools/frontmatter.test.mjs#lifecycle
+        - plugins/spec9/tools/initiative.test.mjs#lifecycle
 ---
 
 # Executable product profile
@@ -109,3 +111,6 @@ present legacy-source deletion as semantic completion.
 decision lifecycle contains additional terminal states.
 [[engine.product-profile|The product profile]] MUST NOT derive those roles from
 list positions.
+[[engine.product-profile|The product profile]] MUST allow ordinary non-decision
+kinds to use multi-state lifecycles without ADR acceptance roles. Initiative
+names, statuses, required fields, and legal relations remain profile-defined.

@@ -34,6 +34,7 @@ export function loadProfile(root) {
  *   requirementsByLocalId: Map<string, Array<{ file: import('./parse.mjs').SpecFile, req: import('./parse.mjs').Requirement }>>,
  *   patternKind: string|null, decisionKind: string|null,
  *   proposedDecisionStatus: string|null, acceptedDecisionStatus: string|null,
+ *   deliveryKind: string|null, deliveries: Entity[], deliveriesByRequirement: Map<string, Entity[]>,
  *   patternRegistry: Map<string, { entity: Entity, obligations: import('./parse.mjs').Requirement[] }> }} Repo
  */
 
@@ -192,10 +193,24 @@ export function loadRepo(root, productRoot = root) {
     }
   }
 
+  // Preserve raw coverage values for validation; indexes never grant coverage.
+  const deliveryKind = typeof profile.delivery?.kind === 'string' ? profile.delivery.kind : null;
+  const deliveries = entities.filter((entity) => entity.kind === deliveryKind);
+  const deliveriesByRequirement = new Map();
+  for (const entity of deliveries) {
+    const covers = entity.file.frontmatter.covers;
+    if (!covers || typeof covers !== 'object' || Array.isArray(covers)) continue;
+    for (const requirement of Object.keys(covers)) {
+      if (!deliveriesByRequirement.has(requirement)) deliveriesByRequirement.set(requirement, []);
+      deliveriesByRequirement.get(requirement).push(entity);
+    }
+  }
+
   return {
     root, productRoot, specPathPrefix, profile, files, filesByPath, sourceWarnings,
     entities, entitiesByContextId, entitiesById, requirementsById, requirementsByLocalId, patternKind,
     decisionKind, proposedDecisionStatus, acceptedDecisionStatus, patternRegistry,
+    deliveryKind, deliveries, deliveriesByRequirement,
   };
 }
 
@@ -424,6 +439,13 @@ export function buildGraph(repo) {
       for (const anchor of c.anchors) {
         edges.push({ from: qualifiedEntityId(fileEntity), to: anchor.target, type: 'evidence', anchorType: anchor.type, pattern: c.pattern, normId: c.normId });
       }
+    }
+  }
+
+  for (const [requirement, deliveries] of repo.deliveriesByRequirement || []) {
+    if (!Map.prototype.has.call(repo.requirementsById, requirement)) continue;
+    for (const entity of deliveries) {
+      edges.push({ from: qualifiedEntityId(entity), to: requirement, type: 'delivery', relation: 'covers' });
     }
   }
 

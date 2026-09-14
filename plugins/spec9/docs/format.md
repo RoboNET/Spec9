@@ -17,6 +17,153 @@ name: IPC between PAM and the monitor daemon
 `id` is unique inside its context. The qualified ID is `context.id`. Every
 `kind` must be declared in `profile.yaml`.
 
+## Initiatives: one place to capture intent
+
+Keep raw ideas, problems, proposals, and concepts in the specification repository
+without turning them into requirements or delivery commitments. An initiative is
+an ordinary profile-defined page, not a built-in backlog model:
+
+```yaml
+sources: [initiatives, terms, operations, decisions, deliveries]
+kinds:
+  initiative:
+    title: Idea, problem, or proposal
+    lifecycle: [idea, exploring, delivering, closed, dropped]
+    required_fields: [name, status]
+relation_types:
+  references: { cardinality: many }
+  motivated_by:
+    cardinality: many
+    sources: [decision, shipment]
+    targets: [initiative]
+```
+
+Merge this example into a product profile that declares the other source
+directories and kinds. Kind names, lifecycle states, and legal relations belong
+to that profile; there is no new top-level `initiative` engine setting.
+Unlike append-only decisions, ordinary kinds do not require `proposed` and
+`accepted` lifecycle roles. Their declared status is still validated.
+
+An initial page can be this small:
+
+```markdown
+---
+id: simpler-onboarding
+kind: initiative
+context: runtime
+name: Simplify onboarding
+status: idea
+---
+# Simplify onboarding
+
+New users struggle to find the first action. Explore how to reduce that friction.
+```
+
+No owner, plan, ADR, evidence, `covers`, or requirements are necessary. Use
+`spec9 draft initiative runtime.simpler-onboarding --name "Simplify onboarding"`
+to print a skeleton; save it under an included source directory and replace the
+placeholder prose.
+
+Keep the initiative as the entry point throughout the work. When an architectural
+choice is needed, an ADR may declare
+`relations.motivated_by: [runtime.simpler-onboarding]`; a delivery may use the same
+relation. The initiative can use `relations.references` to link the existing
+ADRs, domain pages, and deliveries readers should open. These are ordinary
+validated graph relations; they do not accept decisions or supply delivery
+coverage. Not every initiative needs an ADR, and the relationships need not be
+one-to-one. Only link objects once they exist.
+
+Intent lives in the initiative, rationale in ADRs, requirements on domain pages,
+and edition commitments in deliveries. Do not mirror requirements or task lists
+across those objects. An unworked idea with no requirements cannot create a
+missing-delivery error.
+
+## Deliveries (opt-in)
+
+A delivery is a coordination page, not a second source of requirements. Include
+its directory in `sources` and declare exactly one delivery kind:
+
+```yaml
+sources: [terms, operations, decisions, deliveries]
+delivery:
+  kind: shipment
+  status_roles:
+    active: [planned, in-progress]
+    completed: [completed]
+    cancelled: [cancelled]
+kinds:
+  shipment:
+    title: Work delivering requirement editions
+    lifecycle: [planned, in-progress, completed, cancelled]
+    required_fields: [status, owner, covers]
+    required_sections: [Scope, Completion criteria]
+```
+
+Kind and status names belong to the product profile. A delivery page uses
+ordinary identity fields and a mapping from qualified requirement IDs to editions:
+
+```yaml
+---
+id: protocol-upgrade
+kind: shipment
+context: runtime
+name: Deliver the protocol upgrade
+status: in-progress
+owner: protocol-team
+plan: docs/plans/protocol-upgrade.md
+repositories: [specification, server]
+covers:
+  runtime.IPC-001:
+    fingerprint: spec9-requirement-v1:sha256:<64 lowercase hexadecimal characters>
+---
+```
+
+Replace the illustrative fingerprint with the output of
+`spec9 delivery fingerprint runtime.IPC-001`. `covers` is a non-empty mapping,
+not a list. Each entry accepts only the required `fingerprint` field.
+Unqualified IDs are rejected even when globally unique. Optional `repositories`
+is a list of IDs declared in `profile.repositories`. Optional `plan` is a
+product-root-relative existing file; traversal and symlink escapes are rejected.
+Plans can be tracked in Git and visible to CI without belonging to `sources`.
+Spec9 checks their existence, not their headings, tasks, or textual requirement IDs.
+
+With `delivery` enabled, a project requirement whose `decided_by` includes an
+effectively accepted ADR needs current-edition coverage from a valid active or
+completed delivery. Effective status includes `replaces` and `revokes`; proposed
+decisions do not require delivery coverage. Reusable pattern obligations are not
+project requirements and do not require delivery assignments.
+
+At most one active delivery may be assigned to a requirement, regardless of
+fingerprint freshness or completed history. An active old edition is always a
+stale error, even if a completed delivery covers the current edition. Completed
+deliveries cover their recorded edition while it is current; old completed
+editions remain history without stale errors. Multiple completed records, or a
+completed record alongside one active assignment, are not duplicates. Coverage
+is counted once per required requirement, not once per delivery. Cancelled
+deliveries cover nothing.
+
+The normal sequence is active/current → completed/current (still covered) →
+requirement changed (missing, with old completed history preserved) → new
+active/current delivery (covered again). Fingerprints are updated only after
+review, never automatically. Profiles without `delivery` retain their previous
+delivery lint behavior.
+
+Fingerprint v1 hashes UTF-8 canonical JSON with recursively sorted object keys.
+It includes the qualified requirement ID, qualified owner ID, kind, title,
+subjects, `decided_by`, outcomes, partitions, normative sentences, and the full
+requirement Markdown section. Text whitespace is normalized and set-valued fields
+are sorted. Line numbers, paths, Git metadata, implementation evidence, and
+migration `origins` are excluded. Semantic review and delivery lint use the same
+canonicalizer. This detects changed specification content, not whether code
+implements its meaning.
+
+Delivery errors use `E-DELIVERY-SHAPE`, `E-DELIVERY-REQUIREMENT-UNQUALIFIED`,
+`E-DELIVERY-REQUIREMENT-UNKNOWN`, `E-DELIVERY-FINGERPRINT-INVALID`,
+`E-DELIVERY-FINGERPRINT-STALE`, `E-DELIVERY-COVERAGE-MISSING`,
+`E-DELIVERY-COVERAGE-DUPLICATE`, `E-DELIVERY-PLAN-BROKEN`, and
+`E-DELIVERY-REPOSITORY-UNKNOWN`. They fail lint and count as doctor integrity
+errors. No command updates recorded fingerprints automatically.
+
 ## Vocabulary
 
 ```yaml
@@ -171,7 +318,8 @@ relations:
 After acceptance, `status` becomes `accepted`; the previous decision's
 effective status is derived from incoming accepted relations.
 
-Profiles with more than two lifecycle states declare semantic roles explicitly:
+Append-only decision kinds with more than two lifecycle states declare semantic
+roles explicitly; this requirement does not apply to ordinary page kinds:
 
 ```yaml
 kinds:

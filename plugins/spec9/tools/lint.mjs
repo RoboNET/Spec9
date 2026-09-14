@@ -5,6 +5,7 @@ import { resolveLink, resolveAnchor, computeObligations, resolveEntityKey } from
 import { analyzeCoverage, formatCombo, countUndefinedOnlyCoverage } from './combinations.mjs';
 import { checkProfileKeyOwnership } from './profile-registry.mjs';
 import { decisionCycles, decisionIndex, effectiveDecisionStatus } from './decision.mjs';
+import { buildDeliveryReport } from './delivery.mjs';
 
 /**
  * @typedef {{ path: string, line: number, level: 'ERROR'|'WARN', code: string, message: string }} Finding
@@ -854,8 +855,10 @@ function checkLifecycle(repo) {
   const out = [];
   for (const [kind, definition] of Object.entries(repo.profile.kinds || {})) {
     if (!Array.isArray(definition?.lifecycle)) continue;
+    // Delivery has its own active/completed/cancelled role contract.
+    if (kind === repo.deliveryKind) continue;
     const roles = definition.lifecycle_roles;
-    if (definition.lifecycle.length > 2 && (!roles || typeof roles !== 'object' || !roles.proposed || !roles.accepted)) {
+    if (definition.append_only && definition.lifecycle.length > 2 && (!roles || typeof roles !== 'object' || !roles.proposed || !roles.accepted)) {
       out.push(mk('profile.yaml', 1, 'ERROR', 'E-LIFECYCLE-ROLES', `kind "${kind}" must declare lifecycle_roles.proposed and lifecycle_roles.accepted`));
       continue;
     }
@@ -1427,6 +1430,7 @@ const ALL_CHECKS = [
   checkCombinations,
   checkAutoFixForbidden,
   checkProfileRegistry,
+  (repo) => buildDeliveryReport(repo).diagnostics,
 ];
 
 /**

@@ -28,6 +28,12 @@ requirements:
     subjects: [engine.authoring-format]
     evidence:
       test: [plugins/spec9/tools/frontmatter.test.mjs#findLinks]
+  FMT-009:
+    kind: contract
+    subjects: [engine.authoring-format]
+    evidence:
+      schema: [plugins/spec9/docs/format.md]
+      test: [plugins/spec9/tools/delivery.test.mjs]
 ---
 
 # Markdown and frontmatter authoring format
@@ -59,3 +65,11 @@ format]] MUST NOT infer structured data from prose or Markdown tables.
 
 [[engine.authoring-format|The authoring format]] MUST recognize only `MUST`,
 `MUST NOT`, and `MAY` as normative operators outside masked Markdown zones.
+
+### FMT-009 — Deliveries pin structured requirement editions
+
+[[engine.authoring-format|The authoring format]] MUST represent delivery coverage
+as a frontmatter mapping from qualified requirement IDs to mandatory versioned
+fingerprints. [[engine.authoring-format|The authoring format]] MUST reject
+unknown fields inside coverage entries. Delivery kind and status roles belong to
+the product profile; deliveries are ordinary pages included in `sources`.

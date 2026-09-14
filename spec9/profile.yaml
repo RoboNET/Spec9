@@ -1,9 +1,10 @@
 profile: spec9-engine
 
-sources: [terms, contracts, processes, decisions]
+sources: [terms, contracts, processes, decisions, initiatives]
 
 relation_types:
   references:  { cardinality: many }
+  motivated_by: { cardinality: many, sources: [decision], targets: [initiative] }
   depends_on:  { cardinality: many, sources: [component], targets: [component, contract] }
   implements:  { cardinality: many, sources: [component], targets: [contract] }
   triggered_by: { cardinality: one, sources: [process], targets: [component, contract], flow: reverse }
@@ -22,6 +23,11 @@ contexts:
     prefix: [DST, PKG, PLG, PUB]
 
 kinds:
+  initiative:
+    title: Idea, problem, or proposal before and during delivery
+    lifecycle: [idea, exploring, delivering, closed, dropped]
+    required_fields: [name, status]
+
   component:
     title: Executable engine subsystem
     anchors: { required: [code, test] }
