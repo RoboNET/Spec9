@@ -23,7 +23,7 @@ Also inspect the product's build manifests, major boundaries, and existing
 normative documentation. Do not copy Spec9's `tools/`, `docs/`,
 `constitution.md`, or skills into the product repository.
 
-Use `npx --yes spec9@0.1.0` by default. During local engine development, a
+Use `npx --yes spec9@0.2.0` by default. During local engine development, a
 product may depend on the engine through a package-manager file dependency; do
 not hardcode a machine-specific path into reusable product configuration.
 
@@ -79,7 +79,7 @@ that crosses a meaningful boundary and model enough of it to prove the profile:
 Generate profile-aware page skeletons without writing them automatically:
 
 ```bash
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> \
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> \
   draft <kind> <context.id> --name <name>
 ```
 
@@ -92,10 +92,10 @@ into Markdown.
 Run, in this order:
 
 ```bash
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> lint
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> graph
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> doctor --strict
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> quality --all
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> lint
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> graph
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> doctor --strict
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> quality --all
 ```
 
 Treat `lint` failures as contract violations. Treat `quality` findings as

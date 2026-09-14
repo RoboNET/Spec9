@@ -33,7 +33,7 @@ schema, test, or design artifact.
 ## Start from the profile-aware draft
 
 ```bash
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> \
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> \
   draft <kind> <context.id> --name <name>
 ```
 
@@ -94,11 +94,11 @@ change the spec, change the implementation, or classify it as non-domain.
 Run the narrowest useful views while authoring, then the repository checks:
 
 ```bash
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> flow <context.id>
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> trace <context.REQ-ID>
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> lint
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> quality --all
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> doctor --strict
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> flow <context.id>
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> trace <context.REQ-ID>
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> lint
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> quality --all
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> doctor --strict
 ```
 
 Use `context <id> --slice review` to inspect neighborhood without reading the

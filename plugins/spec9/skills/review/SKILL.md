@@ -76,10 +76,10 @@ empty.
 
 When the reviewer asks to drill down, generate only the requested focused view:
 
-- requirement: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> context <context.REQ-ID> --slice review`;
-- decision: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> decision <context.ADR-id>`;
-- process: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> flow <context.id>`;
-- code rationale: `npx --yes spec9@0.1.0 --spec-root <path> --product-root <path> why <path>#<symbol>`.
+- requirement: `npx --yes spec9@0.2.0 --spec-root <path> --product-root <path> context <context.REQ-ID> --slice review`;
+- decision: `npx --yes spec9@0.2.0 --spec-root <path> --product-root <path> decision <context.ADR-id>`;
+- process: `npx --yes spec9@0.2.0 --spec-root <path> --product-root <path> flow <context.id>`;
+- code rationale: `npx --yes spec9@0.2.0 --spec-root <path> --product-root <path> why <path>#<symbol>`.
 
 Open that focused Markdown in the same annotator when useful. Do not expand all
 items pre-emptively.
