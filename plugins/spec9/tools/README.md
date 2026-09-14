@@ -6,14 +6,14 @@ with the `yaml` package; Spec9 does not maintain a custom YAML subset.
 ## Commands
 
 ```text
-npx --yes spec9@0.1.0 --spec-root <spec> --product-root <product> lint
-npx --yes spec9@0.1.0 --spec-root <spec> --product-root <product> graph
-npx --yes spec9@0.1.0 --spec-root <spec> --product-root <product> flow <id>
-npx --yes spec9@0.1.0 --spec-root <spec> --product-root <product> draft <kind> <context.id> --name <name>
-npx --yes spec9@0.1.0 --spec-root <spec> --product-root <product> trace [<requirement-id|context.id>] [--missing] [--json]
-npx --yes spec9@0.1.0 --spec-root <spec> --product-root <product> delivery fingerprint <context.REQ-ID> [--json]
-npx --yes spec9@0.1.0 --spec-root <spec> --product-root <product> review --base <ref> [--head <ref>] [--json] [--strict]
-npx --yes spec9@0.1.0 --spec-root <spec> --product-root <product> change --base <ref> [--head <ref>] [--json]
+npx --yes spec9@0.2.0 --spec-root <spec> --product-root <product> lint
+npx --yes spec9@0.2.0 --spec-root <spec> --product-root <product> graph
+npx --yes spec9@0.2.0 --spec-root <spec> --product-root <product> flow <id>
+npx --yes spec9@0.2.0 --spec-root <spec> --product-root <product> draft <kind> <context.id> --name <name>
+npx --yes spec9@0.2.0 --spec-root <spec> --product-root <product> trace [<requirement-id|context.id>] [--missing] [--json]
+npx --yes spec9@0.2.0 --spec-root <spec> --product-root <product> delivery fingerprint <context.REQ-ID> [--json]
+npx --yes spec9@0.2.0 --spec-root <spec> --product-root <product> review --base <ref> [--head <ref>] [--json] [--strict]
+npx --yes spec9@0.2.0 --spec-root <spec> --product-root <product> change --base <ref> [--head <ref>] [--json]
 ```
 
 Root options may appear before or after the command. A directory containing

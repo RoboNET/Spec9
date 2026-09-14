@@ -25,7 +25,7 @@ repository's diff.
 If the request begins from a requirement or term, load an implementation slice:
 
 ```bash
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> \
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> \
   context <context.REQ-ID-or-context.id> --slice implement
 ```
 
@@ -77,13 +77,13 @@ Run product tests plus checks proportional to the change. The full semantic
 closure is:
 
 ```bash
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> lint
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> trace <context.REQ-ID>
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> e2e --strict
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> doctor --strict
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> quality --all
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> review --base <ref> --strict
-npx --yes spec9@0.1.0 --spec-root <spec-root> --product-root <product-root> change --base <ref>
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> lint
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> trace <context.REQ-ID>
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> e2e --strict
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> doctor --strict
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> quality --all
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> review --base <ref> --strict
+npx --yes spec9@0.2.0 --spec-root <spec-root> --product-root <product-root> change --base <ref>
 ```
 
 When the affected requirement declares domain outcomes and resolves to a
